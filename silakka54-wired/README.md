@@ -1,7 +1,7 @@
 # Silakka54 wired (Vial)
 
-`silakka54.vil` is the last Vial export. The board itself carries a newer layout (read over VIA raw HID on 2026-10-11),
-which is what `../silakka54-wireless` reproduces. Re-export from Vial to refresh the file.
+`silakka54.vil` is a Vial export refreshed from the board itself (read over VIA raw HID on 2026-10-11); it is the layout
+that `../silakka54-wireless` reproduces. Re-export from Vial to refresh the file.
 
 Layout on the board:
 
