@@ -1,0 +1,15 @@
+name: Build ZMK firmware
+on:
+  push:
+    paths: ["silakka54-wireless/**", ".github/workflows/build.yml"]
+  pull_request:
+    paths: ["silakka54-wireless/**", ".github/workflows/build.yml"]
+  workflow_dispatch:
+
+jobs:
+  silakka54-wireless:
+    uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3
+    with:
+      config_path: silakka54-wireless/config
+      build_matrix_path: silakka54-wireless/build.yaml
+      archive_name: silakka54-wireless

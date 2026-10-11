@@ -8,4 +8,4 @@ manifest:
       revision: v0.3
       import: app/west.yml
   self:
-    path: config
+    path: silakka54-wireless/config

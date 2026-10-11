@@ -1,4 +1,4 @@
-# silakka54-zmk-config
+# Silakka54 wireless (ZMK)
 
 ZMK firmware for the PandaKB Silakka54 MX wireless (nice!nano-compatible controller, Sharp/nice!view display).
 Keymap read off the old Vial Silakka54 (VIA raw HID dump), newer than `silakka54.vil` in [AdrienDesola/crkbd](https://github.com/AdrienDesola/crkbd).
@@ -8,7 +8,7 @@ factory firmware uses) with a 54-key matrix transform and physical layout, so ZM
 
 ## Flash
 
-1. Download the artifacts from the latest Actions run: `silakka54_left.uf2`, `silakka54_right.uf2`.
+1. Download the `silakka54-wireless` artifact from the latest Actions run: `silakka54_left.uf2`, `silakka54_right.uf2`.
 2. Plug a half in, double-tap its reset button. A `NICENANO` drive appears.
 3. Copy the matching `.uf2` onto it. The board reboots. Repeat for the other half.
 
