@@ -26,6 +26,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
 #include <zmk/wpm.h>
+#include <zmk/activity.h>
+#include <zmk/events/activity_state_changed.h>
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
@@ -93,9 +95,30 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     lv_canvas_draw_rect(canvas, 0, 21, 68, 42, &rect_white_dsc);
     lv_canvas_draw_rect(canvas, 1, 22, 66, 40, &rect_black_dsc);
 
+    // Grid: dotted rows at 1/4, 1/2, 3/4 of the scale, dotted columns every two samples
+    for (int k = 1; k <= 3; k++) {
+        int y = 60 - 36 * k / 4;
+        for (int x = 2; x <= 65; x += 3) {
+            lv_canvas_set_px_color(canvas, x, y, LVGL_FOREGROUND);
+        }
+    }
+    for (int i = 2; i <= 8; i += 2) {
+        int x = 2 + i * 7;
+        for (int y = 24; y <= 60; y += 3) {
+            lv_canvas_set_px_color(canvas, x, y, LVGL_FOREGROUND);
+        }
+    }
+
     char wpm_text[6] = {};
     snprintf(wpm_text, sizeof(wpm_text), "%d", state->wpm[9]);
     lv_canvas_draw_text(canvas, 42, 52, 24, &label_dsc_wpm, wpm_text);
+
+    // Peak since power-on, top-left of the box
+    lv_draw_label_dsc_t label_dsc_max;
+    init_label_dsc(&label_dsc_max, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
+    char max_text[10] = {};
+    snprintf(max_text, sizeof(max_text), "MAX %d", state->wpm_max);
+    lv_canvas_draw_text(canvas, 3, 24, 60, &label_dsc_max, max_text);
 
     lv_point_t points[10];
     for (int i = 0; i < 10; i++) {
@@ -128,6 +151,37 @@ static void parse_profile_names(void) {
         }
         cursor = comma + 1;
     }
+}
+
+#define NAME_GAP 16
+
+static int name_scroll_offset;
+static bool keyboard_active = true;
+static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state);
+
+static void scroll_work_cb(struct k_work *work) {
+    struct zmk_widget_status *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        draw_middle(widget->obj, widget->cbuf2, &widget->state);
+    }
+}
+K_WORK_DELAYABLE_DEFINE(scroll_work, scroll_work_cb);
+
+static const char *middle_name(const struct status_state *state, int i) {
+    const char *host = host_name_get(i);
+    if (host[0] != '\0') {
+        return host;
+    }
+    if (profile_names[i][0] != '\0') {
+        return profile_names[i];
+    }
+    return state->profiles_bonded[i] ? "" : "open";
+}
+
+static lv_coord_t text_width(const char *text, const lv_font_t *font) {
+    lv_point_t size;
+    lv_txt_get_size(&size, text, font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return size.x;
 }
 
 static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
@@ -167,13 +221,25 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
         snprintf(label, sizeof(label), "%d", i + 1);
         lv_canvas_draw_text(canvas, cx - 8, cy - 10, 16, &label_dsc_black, label);
 
-        const char *host = host_name_get(i);
-        if (host[0] != '\0') {
-            lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, host);
-        } else if (profile_names[i][0] != '\0') {
-            lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, profile_names[i]);
-        } else if (!state->profiles_bonded[i]) {
-            lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, "open");
+        const char *name = middle_name(state, i);
+        lv_coord_t w = text_width(name, &lv_font_montserrat_14);
+        if (w <= CANVAS_SIZE || CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS == 0) {
+            lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, name);
+        } else {
+            // Wider than the screen: marquee, the text drawn twice with a gap so it loops
+            lv_draw_label_dsc_t label_dsc_left;
+            init_label_dsc(&label_dsc_left, LVGL_FOREGROUND, &lv_font_montserrat_14,
+                           LV_TEXT_ALIGN_LEFT);
+            int period = w + NAME_GAP;
+            name_scroll_offset %= period;
+            lv_canvas_draw_text(canvas, -name_scroll_offset, 36, w + 2, &label_dsc_left, name);
+            lv_canvas_draw_text(canvas, period - name_scroll_offset, 36, w + 2, &label_dsc_left,
+                                name);
+            if (keyboard_active) {
+                name_scroll_offset += 2;
+                k_work_schedule_for_queue(zmk_display_work_q(), &scroll_work,
+                                          K_MSEC(CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS));
+            }
         }
     }
 
@@ -267,6 +333,7 @@ static void set_output_status(struct zmk_widget_status *widget,
 }
 
 static void host_name_updated(void) {
+    name_scroll_offset = 0;
     struct zmk_widget_status *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
         draw_middle(widget->obj, widget->cbuf2, &widget->state);
@@ -331,6 +398,9 @@ static void set_wpm_status(struct zmk_widget_status *widget, struct wpm_status_s
         widget->state.wpm[i] = widget->state.wpm[i + 1];
     }
     widget->state.wpm[9] = state.wpm;
+    if (state.wpm > widget->state.wpm_max) {
+        widget->state.wpm_max = state.wpm;
+    }
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
 }
@@ -347,6 +417,22 @@ struct wpm_status_state wpm_status_get_state(const zmk_event_t *eh) {
 ZMK_DISPLAY_WIDGET_LISTENER(widget_wpm_status, struct wpm_status_state, wpm_status_update_cb,
                             wpm_status_get_state)
 ZMK_SUBSCRIPTION(widget_wpm_status, zmk_wpm_state_changed);
+
+static int activity_listener(const zmk_event_t *eh) {
+    const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
+    if (ev == NULL) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    keyboard_active = ev->state == ZMK_ACTIVITY_ACTIVE;
+    if (keyboard_active) {
+        k_work_schedule_for_queue(zmk_display_work_q(), &scroll_work, K_NO_WAIT);
+    } else {
+        k_work_cancel_delayable(&scroll_work);
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+ZMK_LISTENER(widget_name_scroll, activity_listener);
+ZMK_SUBSCRIPTION(widget_name_scroll, zmk_activity_state_changed);
 
 int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     widget->obj = lv_obj_create(parent);

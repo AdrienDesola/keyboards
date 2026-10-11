@@ -22,7 +22,8 @@ After editing in Studio, keymap file changes are ignored until "Restore Stock Se
 ## Status screen
 
 `boards/shields/nice_view_silakka/` is the stock nice!view shield with three changes on the left half:
-a Bluetooth glyph instead of the wifi-looking arcs, a WPM graph on a fixed 0–`CONFIG_NICE_VIEW_SILAKKA_WPM_MAX` scale,
+a Bluetooth glyph instead of the wifi-looking arcs, a WPM graph on a fixed 0–`CONFIG_NICE_VIEW_SILAKKA_WPM_MAX` scale with a dotted grid and the peak since power-on,
 and only the active Bluetooth profile shown, with its name. The name is read from the host's GAP Device Name over GATT
 a few seconds after it connects (Apple devices give the real name once bonded); until then, or if the host has none,
-the fallback comes from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (comma separated, profile 1 first). The right half is unchanged: balloon = linked to the left, mountain = not linked.
+the fallback comes from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (comma separated, profile 1 first). A name wider than the
+screen scrolls, one step every `CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS`, only while the keyboard is active; it freezes when ZMK goes idle. The right half is unchanged: balloon = linked to the left, mountain = not linked.

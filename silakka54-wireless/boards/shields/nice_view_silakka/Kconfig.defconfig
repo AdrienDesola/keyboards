@@ -47,6 +47,10 @@ config NICE_VIEW_SILAKKA_WPM_MAX
     int "Top of the WPM graph scale"
     default 120
 
+config NICE_VIEW_SILAKKA_NAME_SCROLL_MS
+    int "Scroll step for a host name wider than the screen, in ms (0 = truncate instead)"
+    default 150
+
 if !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL
 
 config NICE_VIEW_SILAKKA_WIDGET_STATUS
