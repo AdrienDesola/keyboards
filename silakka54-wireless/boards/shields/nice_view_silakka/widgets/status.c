@@ -31,6 +31,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
+static lv_coord_t text_width(const char *text, const lv_font_t *font);
+
 struct output_status_state {
     struct zmk_endpoint_instance selected_endpoint;
     int active_profile_index;
@@ -109,15 +111,20 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
         lv_canvas_draw_line(canvas, col, 2, &grid_dsc);
     }
 
+    // Current WPM, bottom-right, on a cleared patch so the grid stays out of the digits
     char wpm_text[6] = {};
     snprintf(wpm_text, sizeof(wpm_text), "%d", state->wpm[9]);
+    lv_coord_t wpm_w = text_width(wpm_text, &lv_font_unscii_8);
+    lv_canvas_draw_rect(canvas, 66 - wpm_w - 2, 51, wpm_w + 3, 10, &rect_black_dsc);
     lv_canvas_draw_text(canvas, 42, 52, 24, &label_dsc_wpm, wpm_text);
 
-    // Peak since power-on, top-left of the box
+    // Peak since power-on, top-left, same cleared patch
     lv_draw_label_dsc_t label_dsc_max;
     init_label_dsc(&label_dsc_max, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
     char max_text[10] = {};
     snprintf(max_text, sizeof(max_text), "MAX %d", state->wpm_max);
+    lv_coord_t max_w = text_width(max_text, &lv_font_unscii_8);
+    lv_canvas_draw_rect(canvas, 2, 23, max_w + 3, 10, &rect_black_dsc);
     lv_canvas_draw_text(canvas, 3, 24, 60, &label_dsc_max, max_text);
 
     lv_point_t points[10];
