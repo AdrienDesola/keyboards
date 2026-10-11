@@ -1,0 +1,8 @@
+file_format: "1"
+id: nice_view_silakka
+name: nice!view (Silakka54 status screen)
+type: shield
+url: https://github.com/AdrienDesola/keyboards
+requires: [nice_view_header]
+features:
+  - display

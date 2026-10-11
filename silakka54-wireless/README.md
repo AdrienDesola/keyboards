@@ -18,3 +18,10 @@ To clear Bluetooth bonds (halves not pairing): flash `settings_reset` on both ha
 
 Enabled on the left half over USB. Hold Enter for the Nav layer: `\` = Studio unlock, `0` = bootloader (only the half pressed), `9` = USB/Bluetooth toggle, `` ` `` = clear Bluetooth profile, `1`–`5` = Bluetooth profiles.
 After editing in Studio, keymap file changes are ignored until "Restore Stock Settings" in Studio.
+
+## Status screen
+
+`boards/shields/nice_view_silakka/` is the stock nice!view shield with three changes on the left half:
+a Bluetooth glyph instead of the wifi-looking arcs, a WPM graph on a fixed 0–`CONFIG_NICE_VIEW_SILAKKA_WPM_MAX` scale,
+and only the active Bluetooth profile shown, with its name from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES`
+(comma separated, profile 1 first). The right half is unchanged: balloon = linked to the left, mountain = not linked.
