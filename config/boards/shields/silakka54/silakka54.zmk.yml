@@ -1,0 +1,14 @@
+file_format: "1"
+id: silakka54
+name: Silakka54
+type: shield
+url: https://github.com/Squalius-cephalus/silakka54
+requires: [pro_micro]
+exposes: [i2c_oled]
+features:
+  - keys
+  - display
+  - studio
+siblings:
+  - silakka54_left
+  - silakka54_right

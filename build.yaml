@@ -1,15 +1,11 @@
-# GitHub Actions build matrix. Stock PandaKB firmware uses the Lily58 shield
-# (USB product name "Lily58"); the Silakka54 is wired the same with 4 positions
-# unpopulated, mapped to &none in the keymap. Sharp display = nice!view.
+# GitHub Actions build matrix. Native silakka54 shield lives in
+# config/boards/shields/silakka54. Sharp display = nice!view.
 ---
 include:
   - board: nice_nano_v2
-    shield: lily58_left nice_view_adapter nice_view
+    shield: silakka54_left nice_view_adapter nice_view
     snippet: studio-rpc-usb-uart
-    artifact-name: silakka54_left
   - board: nice_nano_v2
-    shield: lily58_right nice_view_adapter nice_view
-    artifact-name: silakka54_right
+    shield: silakka54_right nice_view_adapter nice_view
   - board: nice_nano_v2
     shield: settings_reset
-    artifact-name: settings_reset

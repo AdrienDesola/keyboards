@@ -3,12 +3,12 @@
 ZMK firmware for the PandaKB Silakka54 MX wireless (nice!nano-compatible controller, Sharp/nice!view display).
 Keymap ported from `silakka54.vil` in [AdrienDesola/crkbd](https://github.com/AdrienDesola/crkbd).
 
-Uses the stock `lily58` shield (same wiring as the PandaKB factory firmware); the 4 Lily58 positions
-absent on the Silakka54 are `&none`.
+Native `silakka54` shield in `config/boards/shields/silakka54/`: Lily58 pin wiring (what the PandaKB
+factory firmware uses) with a 54-key matrix transform and physical layout, so ZMK Studio shows the real board.
 
 ## Flash
 
-1. Download the artifacts from the latest Actions run: `silakka54_left`, `silakka54_right`.
+1. Download the artifacts from the latest Actions run: `silakka54_left-nice_nano_v2-zmk.uf2`, `silakka54_right-nice_nano_v2-zmk.uf2`.
 2. Plug a half in, double-tap its reset button. A `NICENANO` drive appears.
 3. Copy the matching `.uf2` onto it. The board reboots. Repeat for the other half.
 
