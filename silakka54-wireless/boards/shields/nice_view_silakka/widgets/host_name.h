@@ -9,7 +9,7 @@
 
 #include <stdbool.h>
 
-#define HOST_NAME_MAX 18
+#define HOST_NAME_MAX 24
 
 typedef void (*host_name_update_cb_t)(void);
 
