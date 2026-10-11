@@ -8,7 +8,7 @@ factory firmware uses) with a 54-key matrix transform and physical layout, so ZM
 
 ## Flash
 
-1. Download the artifacts from the latest Actions run: `silakka54_left-nice_nano_v2-zmk.uf2`, `silakka54_right-nice_nano_v2-zmk.uf2`.
+1. Download the artifacts from the latest Actions run: `silakka54_left.uf2`, `silakka54_right.uf2`.
 2. Plug a half in, double-tap its reset button. A `NICENANO` drive appears.
 3. Copy the matching `.uf2` onto it. The board reboots. Repeat for the other half.
 
