@@ -61,7 +61,7 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     lv_draw_rect_dsc_t rect_white_dsc;
     init_rect_dsc(&rect_white_dsc, LVGL_FOREGROUND);
     lv_draw_line_dsc_t line_dsc;
-    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 1);
+    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 2);
 
     // Fill background
     lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);
@@ -95,18 +95,18 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     lv_canvas_draw_rect(canvas, 0, 21, 68, 42, &rect_white_dsc);
     lv_canvas_draw_rect(canvas, 1, 22, 66, 40, &rect_black_dsc);
 
-    // Grid: dotted rows at 1/4, 1/2, 3/4 of the scale, dotted columns every two samples
+    // Grid: rows at 1/4, 1/2, 3/4 of the scale, columns every two samples
+    lv_draw_line_dsc_t grid_dsc;
+    init_line_dsc(&grid_dsc, LVGL_FOREGROUND, 1);
     for (int k = 1; k <= 3; k++) {
         int y = 60 - 36 * k / 4;
-        for (int x = 2; x <= 65; x += 3) {
-            lv_canvas_set_px_color(canvas, x, y, LVGL_FOREGROUND);
-        }
+        lv_point_t row[2] = {{2, y}, {65, y}};
+        lv_canvas_draw_line(canvas, row, 2, &grid_dsc);
     }
     for (int i = 2; i <= 8; i += 2) {
         int x = 2 + i * 7;
-        for (int y = 24; y <= 60; y += 3) {
-            lv_canvas_set_px_color(canvas, x, y, LVGL_FOREGROUND);
-        }
+        lv_point_t col[2] = {{x, 24}, {x, 60}};
+        lv_canvas_draw_line(canvas, col, 2, &grid_dsc);
     }
 
     char wpm_text[6] = {};
@@ -156,6 +156,8 @@ static void parse_profile_names(void) {
 #define NAME_GAP 16
 
 static int name_scroll_offset;
+static int name_scroll_remaining; /* pixels left in the single pass, 0 = parked */
+static char scrolled_name[32];
 static bool keyboard_active = true;
 static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state);
 
@@ -223,6 +225,13 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
 
         const char *name = middle_name(state, i);
         lv_coord_t w = text_width(name, &lv_font_montserrat_14);
+        if (strncmp(name, scrolled_name, sizeof(scrolled_name)) != 0) {
+            // New name: one full pass, then park at the start
+            strncpy(scrolled_name, name, sizeof(scrolled_name) - 1);
+            scrolled_name[sizeof(scrolled_name) - 1] = '\0';
+            name_scroll_offset = 0;
+            name_scroll_remaining = w + NAME_GAP;
+        }
         if (w <= CANVAS_SIZE || CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS == 0) {
             lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, name);
         } else {
@@ -235,8 +244,13 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
             lv_canvas_draw_text(canvas, -name_scroll_offset, 36, w + 2, &label_dsc_left, name);
             lv_canvas_draw_text(canvas, period - name_scroll_offset, 36, w + 2, &label_dsc_left,
                                 name);
-            if (keyboard_active) {
+            if (keyboard_active && name_scroll_remaining > 0) {
                 name_scroll_offset += 2;
+                name_scroll_remaining -= 2;
+                if (name_scroll_remaining <= 0) {
+                    name_scroll_offset = 0; // last step redraws parked at the start
+                    name_scroll_remaining = 0;
+                }
                 k_work_schedule_for_queue(zmk_display_work_q(), &scroll_work,
                                           K_MSEC(CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS));
             }
@@ -333,7 +347,6 @@ static void set_output_status(struct zmk_widget_status *widget,
 }
 
 static void host_name_updated(void) {
-    name_scroll_offset = 0;
     struct zmk_widget_status *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
         draw_middle(widget->obj, widget->cbuf2, &widget->state);
