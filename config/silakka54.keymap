@@ -1,5 +1,6 @@
 /*
- * Silakka54 keymap, ported from silakka54.vil (Vial).
+ * Silakka54 keymap, read off the old Vial Silakka54 over the VIA raw HID
+ * protocol (2026-10-11), so it matches what the hands already know.
  */
 
 #include <behaviors.dtsi>
@@ -12,34 +13,50 @@
         compatible = "zmk,keymap";
 
         base_layer {
-// |  `   |  1  |  2  |  3  |  4  |  5  |                  |  6  |  7  |  8  |  9  |  0  |  \   |
-// | TAB  |  Q  |  W  |  E  |  R  |  T  |                  |  Y  |  U  |  I  |  O  |  P  | BSPC |
-// |CTL/ESC| A  |  S  |  D  |  F  |  G  |                  |  H  |  J  |  K  |  L  |  ;  |  '   |
-// | SHFT |  Z  |  X  |  C  |  V  |  B  |                  |  N  |  M  |  ,  |  .  |  /  | SHFT |
-//                    | ALT | GUI | SPC |                  |ENT/FN| FN | RALT|
+// |   `   |  1  |  2  |  3  |  4  |  5  |                  |  6  |  7  |  8  |  9  |  0  |   \   |
+// |  TAB  |  Q  |  W  |  E  |  R  |  T  |                  |  Y  |  U  |  I  |  O  |  P  | BSPC  |
+// |CTL/ESC|  A  |  S  |  D  |  F  |  G  |                  |  H  |  J  |  K  |  L  |  ;  |   '   |
+// | SHIFT |ALT/Z|  X  |  C  |  V  |  B  |                  |  N  |  M  |  ,  |  .  |RALT//| SHIFT |
+//                     | MEH | CMD |L1/SPC|                 |L2/ENT| CMD |     |
             display-name = "Base";
             bindings = <
-&kp GRAVE     &kp N1 &kp N2 &kp N3   &kp N4   &kp N5                       &kp N6  &kp N7 &kp N8    &kp N9  &kp N0   &kp BSLH
-&kp TAB       &kp Q  &kp W  &kp E    &kp R    &kp T                        &kp Y   &kp U  &kp I     &kp O   &kp P    &kp BSPC
-&mt LCTRL ESC &kp A  &kp S  &kp D    &kp F    &kp G                        &kp H   &kp J  &kp K     &kp L   &kp SEMI &kp SQT
-&kp LSHFT     &kp Z  &kp X  &kp C    &kp V    &kp B                        &kp N   &kp M  &kp COMMA &kp DOT &kp FSLH &kp RSHFT
-                            &kp LALT &kp LGUI &kp SPACE                    &lt 1 RET &mo 1 &kp RALT
+&kp GRAVE     &kp N1        &kp N2 &kp N3   &kp N4   &kp N5                       &kp N6    &kp N7   &kp N8    &kp N9  &kp N0       &kp BSLH
+&kp TAB       &kp Q         &kp W  &kp E    &kp R    &kp T                        &kp Y     &kp U    &kp I     &kp O   &kp P        &kp BSPC
+&mt LCTRL ESC &kp A         &kp S  &kp D    &kp F    &kp G                        &kp H     &kp J    &kp K     &kp L   &kp SEMI     &kp SQT
+&kp LSHFT     &mt LALT Z    &kp X  &kp C    &kp V    &kp B                        &kp N     &kp M    &kp COMMA &kp DOT &mt RALT FSLH &kp RSHFT
+                            &kp LS(LC(LALT)) &kp LGUI &lt 1 SPACE                 &lt 2 RET &kp RGUI &none
             >;
         };
 
-        fn_layer {
-// | F11  | F1  | F2  | F3  | F4  | F5  |                  | F6  | F7  | F8  | F9  | F10 | F12  |
-// | BOOT |     |     |     |     |     |                  |     |  -  |  =  |  [  |  ]  |      |
-// |      |     |     |     |     |     |                  |  <- |  v  |  ^  |  -> |     |      |
-// |BTCLR | BT0 | BT1 | BT2 | BT3 | BT4 |                  |USB/BLE|   |     |     |     |UNLOCK|
-//                    |     |     |     |                  |     |     |     |
-            display-name = "Fn";
+        symbols_layer {
+// |       | F1  | F2  | F3  | F4  | F5  |                  | F6  | F7  | F8  | F9  | F10 |  F11  |
+// |       |  !  |  @  |  #  |  $  |  %  |                  |  =  |  -  |  [  |  ]  |     | BSPC  |
+// |       |  ^  |  &  |  *  |  (  |  )  |                  |     |     |     |     |     |  F12  |
+// |       |     |  [  |  ]  |  {  |  }  |                  |     |     |     |     |     |       |
+//                     |     |     |     |                  |     |     |     |
+            display-name = "Symbols";
             bindings = <
-&kp F11    &kp F1       &kp F2       &kp F3       &kp F4       &kp F5                       &kp F6       &kp F7    &kp F8    &kp F9   &kp F10  &kp F12
-&bootloader &trans      &trans       &trans       &trans       &trans                       &trans       &kp MINUS &kp EQUAL &kp LBKT &kp RBKT &trans
-&trans     &trans       &trans       &trans       &trans       &trans                       &kp LEFT     &kp DOWN  &kp UP    &kp RIGHT &trans  &trans
-&bt BT_CLR &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4                 &out OUT_TOG &trans    &trans    &trans   &trans   &studio_unlock
-                                     &trans       &trans       &trans                       &trans       &trans    &trans
+&trans &kp F1    &kp F2   &kp F3   &kp F4   &kp F5                       &kp F6    &kp F7    &kp F8   &kp F9   &kp F10 &kp F11
+&trans &kp EXCL  &kp AT   &kp HASH &kp DLLR &kp PRCNT                    &kp EQUAL &kp MINUS &kp LBKT &kp RBKT &none   &kp BSPC
+&trans &kp CARET &kp AMPS &kp STAR &kp LPAR &kp RPAR                     &none     &none     &none    &none    &none   &kp F12
+&trans &trans    &kp LBKT &kp RBKT &kp LBRC &kp RBRC                     &none     &none     &none    &none    &trans  &trans
+                          &trans   &trans   &trans                       &trans    &trans    &trans
+            >;
+        };
+
+        nav_layer {
+// | BTCLR | BT0 | BT1 | BT2 | BT3 | BT4 |                  |     |     |     |USB/BT|BOOT |UNLOCK |
+// |       |     |VOL- |VOL+ |MUTE |     |                  | HOME|     |  [  |  ]  |     | PGUP  |
+// |       | RW  | FF  |STOP |PLAY |     |                  | <-  |  v  |  ^  |  -> |     | PGDN  |
+// |       |     |     |     |     |     |                  |     |     |     |     |     |       |
+//                     |     |     |     |                  |     |     |     |
+            display-name = "Nav";
+            bindings = <
+&bt BT_CLR &bt BT_SEL 0 &bt BT_SEL 1 &bt BT_SEL 2 &bt BT_SEL 3 &bt BT_SEL 4             &none    &none    &none    &out OUT_TOG &bootloader &studio_unlock
+&trans     &none        &kp C_VOL_DN &kp C_VOL_UP &kp C_MUTE   &none                    &kp HOME &none    &kp LBKT &kp RBKT     &none       &kp PG_UP
+&trans     &kp C_RW     &kp C_FF     &kp C_STOP   &kp C_PP     &none                    &kp LEFT &kp DOWN &kp UP   &kp RIGHT    &none       &kp PG_DN
+&trans     &trans       &none        &none        &none        &none                    &none    &none    &none    &none        &trans      &trans
+                                     &trans       &trans       &trans                   &trans   &trans   &trans
             >;
         };
 
