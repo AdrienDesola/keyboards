@@ -13,6 +13,7 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/battery.h>
 #include <zmk/display.h>
 #include "status.h"
+#include "host_name.h"
 #include <zmk/events/usb_conn_state_changed.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/battery_state_changed.h>
@@ -166,7 +167,10 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
         snprintf(label, sizeof(label), "%d", i + 1);
         lv_canvas_draw_text(canvas, cx - 8, cy - 10, 16, &label_dsc_black, label);
 
-        if (profile_names[i][0] != '\0') {
+        const char *host = host_name_get(i);
+        if (host[0] != '\0') {
+            lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, host);
+        } else if (profile_names[i][0] != '\0') {
             lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, profile_names[i]);
         } else if (!state->profiles_bonded[i]) {
             lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, "open");
@@ -249,8 +253,24 @@ static void set_output_status(struct zmk_widget_status *widget,
         widget->state.profiles_bonded[i] = state->profiles_bonded[i];
     }
 
+    for (int i = 0; i < NICEVIEW_PROFILE_COUNT; ++i) {
+        if (!state->profiles_bonded[i]) {
+            host_name_clear(i);
+        }
+    }
+    if (state->active_profile_connected) {
+        host_name_request(state->active_profile_index);
+    }
+
     draw_top(widget->obj, widget->cbuf, &widget->state);
     draw_middle(widget->obj, widget->cbuf2, &widget->state);
+}
+
+static void host_name_updated(void) {
+    struct zmk_widget_status *widget;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
+        draw_middle(widget->obj, widget->cbuf2, &widget->state);
+    }
 }
 
 static void output_status_update_cb(struct output_status_state state) {
@@ -342,6 +362,7 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     lv_canvas_set_buffer(bottom, widget->cbuf3, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
 
     parse_profile_names();
+    host_name_set_update_cb(host_name_updated);
     sys_slist_append(&widgets, &widget->node);
     widget_battery_status_init();
     widget_output_status_init();
