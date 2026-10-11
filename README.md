@@ -16,5 +16,5 @@ To clear Bluetooth bonds (halves not pairing): flash `settings_reset` on both ha
 
 ## ZMK Studio
 
-Enabled on the left half over USB. Unlock key: `Fn` + right Shift.
+Enabled on the left half over USB. Unlock key: `Fn` + right Shift. Bootloader (no reset button): `Fn` + Tab, puts both halves in bootloader; power-cycle the half you are not flashing.
 After editing in Studio, keymap file changes are ignored until "Restore Stock Settings" in Studio.
