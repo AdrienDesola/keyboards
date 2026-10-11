@@ -10,6 +10,6 @@ jobs:
   silakka54-wireless:
     uses: zmkfirmware/zmk/.github/workflows/build-user-config.yml@v0.3
     with:
-      config_path: silakka54-wireless/config
+      config_path: silakka54-wireless
       build_matrix_path: silakka54-wireless/build.yaml
       archive_name: silakka54-wireless
