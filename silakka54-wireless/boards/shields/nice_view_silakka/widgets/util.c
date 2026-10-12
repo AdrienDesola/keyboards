@@ -43,6 +43,22 @@ void draw_battery(lv_obj_t *canvas, const struct status_state *state) {
     }
 }
 
+void draw_bt_badge(lv_obj_t *canvas, lv_coord_t x, lv_coord_t y) {
+    lv_draw_rect_dsc_t badge_dsc;
+    init_rect_dsc(&badge_dsc, LVGL_FOREGROUND);
+    badge_dsc.radius = 5;
+    lv_canvas_draw_rect(canvas, x, y, 12, 16, &badge_dsc);
+
+    lv_draw_line_dsc_t rune_dsc;
+    init_line_dsc(&rune_dsc, LVGL_BACKGROUND, 1);
+    lv_point_t stem[2] = {{x + 6, y + 2}, {x + 6, y + 13}};
+    lv_point_t upper[3] = {{x + 3, y + 5}, {x + 9, y + 11}, {x + 6, y + 14}};
+    lv_point_t lower[3] = {{x + 3, y + 11}, {x + 9, y + 5}, {x + 6, y + 2}};
+    lv_canvas_draw_line(canvas, stem, 2, &rune_dsc);
+    lv_canvas_draw_line(canvas, upper, 3, &rune_dsc);
+    lv_canvas_draw_line(canvas, lower, 3, &rune_dsc);
+}
+
 void init_label_dsc(lv_draw_label_dsc_t *label_dsc, lv_color_t color, const lv_font_t *font,
                     lv_text_align_t align) {
     lv_draw_label_dsc_init(label_dsc);

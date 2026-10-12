@@ -71,7 +71,7 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     // Draw battery
     draw_battery(canvas, state);
 
-    // Draw output status
+    // Draw output status: USB glyph, or the Bluetooth badge when the profile is linked
     char output_text[10] = {};
 
     switch (state->selected_endpoint.transport) {
@@ -80,9 +80,7 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
         break;
     case ZMK_TRANSPORT_BLE:
         if (state->active_profile_bonded) {
-            if (state->active_profile_connected) {
-                strcat(output_text, LV_SYMBOL_BLUETOOTH);
-            } else {
+            if (!state->active_profile_connected) {
                 strcat(output_text, LV_SYMBOL_CLOSE);
             }
         } else {
@@ -91,7 +89,11 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
         break;
     }
 
-    lv_canvas_draw_text(canvas, 0, 0, CANVAS_SIZE, &label_dsc, output_text);
+    if (output_text[0] != '\0') {
+        lv_canvas_draw_text(canvas, 0, 0, CANVAS_SIZE, &label_dsc, output_text);
+    } else if (state->selected_endpoint.transport == ZMK_TRANSPORT_BLE) {
+        draw_bt_badge(canvas, CANVAS_SIZE - 14, 1);
+    }
 
     // Draw WPM
     lv_canvas_draw_rect(canvas, 0, 21, 68, 42, &rect_white_dsc);

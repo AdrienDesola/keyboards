@@ -1,18 +1,22 @@
 /*
+ * Right-half status: battery and link state in the top strip, Jack Skellington
+ * below. Awake while linked (a short blink every ART_BLINK_MS while this half
+ * is being typed on; a blink and a bat flap every ART_IDLE_MS otherwise),
+ * asleep in his coffin while not linked (the Zs drift once every ART_IDLE_MS).
+ * Every move is one or two redraws; nothing runs between them.
  *
- * Copyright (c) 2023 The ZMK Contributors
  * SPDX-License-Identifier: MIT
- *
  */
 
 #include <zephyr/kernel.h>
-#include <zephyr/random/random.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
+#include <zmk/activity.h>
 #include <zmk/battery.h>
 #include <zmk/display.h>
+#include <zmk/events/activity_state_changed.h>
 #include <zmk/events/usb_conn_state_changed.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/battery_state_changed.h>
@@ -23,10 +27,21 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include "peripheral_status.h"
 
-LV_IMG_DECLARE(balloon);
-LV_IMG_DECLARE(mountain);
+LV_IMG_DECLARE(jack_a);   // awake, eyes open
+LV_IMG_DECLARE(jack_b);   // awake, blink
+LV_IMG_DECLARE(jack_c);   // awake, bat wings down
+LV_IMG_DECLARE(coffin_a); // asleep
+LV_IMG_DECLARE(coffin_b); // asleep, Zs drifted up
+
+#define BLINK_HOLD_MS 250
+#define FLAP_HOLD_MS 600
+#define ZZ_HOLD_MS 1000
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
+static lv_obj_t *art;
+static bool linked;
+static bool typing = true;
+static int step; // position in the current motion sequence
 
 struct peripheral_status_state {
     bool connected;
@@ -46,13 +61,112 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     // Draw battery
     draw_battery(canvas, state);
 
-    // Draw output status
-    lv_canvas_draw_text(canvas, 0, 0, CANVAS_SIZE, &label_dsc,
-                        state->connected ? LV_SYMBOL_WIFI : LV_SYMBOL_CLOSE);
+    // Link to the central: badge when linked, X otherwise
+    if (state->connected) {
+        draw_bt_badge(canvas, CANVAS_SIZE - 14, 1);
+    } else {
+        lv_canvas_draw_text(canvas, 0, 0, CANVAS_SIZE, &label_dsc, LV_SYMBOL_CLOSE);
+    }
 
     // Rotate canvas
     rotate_canvas(canvas, cbuf);
 }
+
+/* ---- motion ---------------------------------------------------------- */
+
+static void motion_work_cb(struct k_work *work);
+K_WORK_DELAYABLE_DEFINE(motion_work, motion_work_cb);
+
+static void schedule(int ms) {
+    if (ms > 0) {
+        k_work_schedule_for_queue(zmk_display_work_q(), &motion_work, K_MSEC(ms));
+    }
+}
+
+static void restart_motion(void) {
+    step = 0;
+    k_work_cancel_delayable(&motion_work);
+    if (!art) {
+        return;
+    }
+    lv_img_set_src(art, linked ? &jack_a : &coffin_a);
+    if (!linked) {
+        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
+    } else if (typing) {
+        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS);
+    } else {
+        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
+    }
+}
+
+static void motion_work_cb(struct k_work *work) {
+    if (!art) {
+        return;
+    }
+    if (!linked) {
+        // asleep: Zs up for a second, then back
+        if (step == 0) {
+            lv_img_set_src(art, &coffin_b);
+            step = 1;
+            schedule(ZZ_HOLD_MS);
+        } else {
+            lv_img_set_src(art, &coffin_a);
+            step = 0;
+            schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
+        }
+        return;
+    }
+    if (typing) {
+        // awake and in use: blink
+        if (step == 0) {
+            lv_img_set_src(art, &jack_b);
+            step = 1;
+            schedule(BLINK_HOLD_MS);
+        } else {
+            lv_img_set_src(art, &jack_a);
+            step = 0;
+            schedule(CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS);
+        }
+        return;
+    }
+    // awake and idle: blink, bat flaps, back to still
+    switch (step) {
+    case 0:
+        lv_img_set_src(art, &jack_b);
+        step = 1;
+        schedule(BLINK_HOLD_MS);
+        break;
+    case 1:
+        lv_img_set_src(art, &jack_c);
+        step = 2;
+        schedule(FLAP_HOLD_MS);
+        break;
+    default:
+        lv_img_set_src(art, &jack_a);
+        step = 0;
+        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
+        break;
+    }
+}
+
+static int activity_listener(const zmk_event_t *eh) {
+    const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
+    if (ev == NULL) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    bool now_typing = ev->state == ZMK_ACTIVITY_ACTIVE;
+    if (now_typing != typing) {
+        typing = now_typing;
+        k_work_schedule_for_queue(zmk_display_work_q(), &motion_work, K_NO_WAIT);
+        step = 0;
+        restart_motion();
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+ZMK_LISTENER(widget_art_motion, activity_listener);
+ZMK_SUBSCRIPTION(widget_art_motion, zmk_activity_state_changed);
+
+/* ---- battery --------------------------------------------------------- */
 
 static void set_battery_status(struct zmk_widget_status *widget,
                                struct battery_status_state state) {
@@ -87,6 +201,8 @@ ZMK_SUBSCRIPTION(widget_battery_status, zmk_battery_state_changed);
 ZMK_SUBSCRIPTION(widget_battery_status, zmk_usb_conn_state_changed);
 #endif /* IS_ENABLED(CONFIG_USB_DEVICE_STACK) */
 
+/* ---- link state ------------------------------------------------------ */
+
 static struct peripheral_status_state get_state(const zmk_event_t *_eh) {
     return (struct peripheral_status_state){.connected = zmk_split_bt_peripheral_is_connected()};
 }
@@ -96,6 +212,11 @@ static void set_connection_status(struct zmk_widget_status *widget,
     widget->state.connected = state.connected;
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
+
+    if (state.connected != linked) {
+        linked = state.connected;
+        restart_motion();
+    }
 }
 
 static void output_status_update_cb(struct peripheral_status_state state) {
@@ -114,14 +235,14 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     lv_obj_align(top, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_canvas_set_buffer(top, widget->cbuf, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
 
-    lv_obj_t *art = lv_img_create(widget->obj);
-    bool random = sys_rand32_get() & 1;
-    lv_img_set_src(art, random ? &balloon : &mountain);
+    art = lv_img_create(widget->obj);
     lv_obj_align(art, LV_ALIGN_TOP_LEFT, 0, 0);
 
     sys_slist_append(&widgets, &widget->node);
     widget_battery_status_init();
     widget_peripheral_status_init();
+    linked = zmk_split_bt_peripheral_is_connected();
+    restart_motion();
 
     return 0;
 }
