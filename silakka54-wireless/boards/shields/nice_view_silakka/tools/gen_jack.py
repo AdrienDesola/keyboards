@@ -6,6 +6,10 @@ import sys, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 from PIL import Image, ImageDraw
 W, H = 68, 140
+# The right panel on this board shows the stock palette as a negative (the left
+# half's canvas comes out white on black too). Flip the art so Jack reads as
+# black ink on a light ground like the mock; set False for a standard nice!view.
+INVERT = True
 
 def to_lvgl(bits, name):
     BW, BH = 140, 68
@@ -130,6 +134,8 @@ def main(outdir):
            "#include <lvgl.h>", "", "#ifndef LV_ATTRIBUTE_MEM_ALIGN", "#define LV_ATTRIBUTE_MEM_ALIGN", "#endif"]
     src = hdr[:]
     for n, b in frames.items():
+        if INVERT:
+            b = [[1 - p for p in row] for row in b]
         src.append(to_lvgl(b, n))
         preview(b, os.path.join(outdir, f'preview_{n}.png'))
     open(os.path.join(HERE, '..', 'widgets', 'art.c'), 'w').write("\n".join(src))
