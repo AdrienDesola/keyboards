@@ -175,10 +175,11 @@ static lv_coord_t text_width(const char *text, const lv_font_t *font) {
     return size.x;
 }
 
-/* Copy name into out, dropping trailing characters until it wraps within two
- * lines of the name font across the canvas width. */
+/* Copy name into out, dropping trailing words until it wraps within two lines
+ * of the name font across the canvas width. A single word too wide for a line
+ * is cut by letters as a last resort. */
 static void fit_two_lines(const char *name, char *out, size_t out_len) {
-    const lv_font_t *font = &lv_font_montserrat_14;
+    const lv_font_t *font = &lv_font_montserrat_12;
     const lv_coord_t max_h = 2 * lv_font_get_line_height(font);
     strncpy(out, name, out_len - 1);
     out[out_len - 1] = '\0';
@@ -187,6 +188,11 @@ static void fit_two_lines(const char *name, char *out, size_t out_len) {
         lv_txt_get_size(&size, out, font, 0, 0, CANVAS_SIZE, LV_TEXT_FLAG_NONE);
         if (size.y <= max_h || out[0] == '\0') {
             return;
+        }
+        char *space = strrchr(out, ' ');
+        if (space) {
+            *space = '\0';
+            continue;
         }
         size_t n = strlen(out);
         do {
@@ -208,7 +214,7 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     lv_draw_label_dsc_t label_dsc_black;
     init_label_dsc(&label_dsc_black, LVGL_BACKGROUND, &lv_font_montserrat_18, LV_TEXT_ALIGN_CENTER);
     lv_draw_label_dsc_t label_dsc_name;
-    init_label_dsc(&label_dsc_name, LVGL_FOREGROUND, &lv_font_montserrat_14, LV_TEXT_ALIGN_CENTER);
+    init_label_dsc(&label_dsc_name, LVGL_FOREGROUND, &lv_font_montserrat_12, LV_TEXT_ALIGN_CENTER);
 
     // Fill background
     lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);

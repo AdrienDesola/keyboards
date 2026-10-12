@@ -3,6 +3,8 @@
  */
 
 #include <zephyr/kernel.h>
+#include <string.h>
+#include <strings.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -52,6 +54,13 @@ static void sanitize_name(const uint8_t *in, size_t len, char *out, size_t out_m
         i += seq;
     }
     out[o] = '\0';
+
+    // Drop the configured prefix (typically the owner's name), case-insensitively
+    const char *strip = CONFIG_NICE_VIEW_SILAKKA_NAME_STRIP;
+    size_t sl = strlen(strip);
+    if (sl > 0 && strncasecmp(out, strip, sl) == 0 && out[sl] != '\0') {
+        memmove(out, out + sl, strlen(out + sl) + 1);
+    }
 }
 
 static void notify_work_cb(struct k_work *work) {

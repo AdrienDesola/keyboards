@@ -47,11 +47,16 @@ config NICE_VIEW_SILAKKA_WPM_MAX
     int "Top of the WPM graph scale"
     default 120
 
+config NICE_VIEW_SILAKKA_NAME_STRIP
+    string "Prefix removed from host names before display (e.g. your own name)"
+    default ""
+
 if !ZMK_SPLIT || ZMK_SPLIT_ROLE_CENTRAL
 
 config NICE_VIEW_SILAKKA_WIDGET_STATUS
     select LV_FONT_MONTSERRAT_18
     select LV_FONT_MONTSERRAT_14
+    select LV_FONT_MONTSERRAT_12
     select LV_FONT_UNSCII_8
     select ZMK_WPM
 
