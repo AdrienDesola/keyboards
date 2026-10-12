@@ -27,6 +27,33 @@ static int read_profile = -1;
 static struct bt_gatt_read_params read_params;
 static struct bt_uuid_16 name_uuid = BT_UUID_INIT_16(BT_UUID_GAP_DEVICE_NAME_VAL);
 
+/* The built-in Montserrat fonts only carry ASCII (plus a few symbols). Fold the
+ * typographic quotes macOS uses in "Adrien's MacBook" to ASCII and drop
+ * anything else outside ASCII. */
+static void sanitize_name(const uint8_t *in, size_t len, char *out, size_t out_max) {
+    size_t o = 0;
+    for (size_t i = 0; i < len && o < out_max;) {
+        uint8_t c = in[i];
+        if (c < 0x80) {
+            if (c >= 0x20) {
+                out[o++] = (char)c;
+            }
+            i++;
+            continue;
+        }
+        size_t seq = (c >= 0xF0) ? 4 : (c >= 0xE0) ? 3 : 2;
+        if (seq == 3 && i + 2 < len && in[i] == 0xE2 && in[i + 1] == 0x80 &&
+            (in[i + 2] == 0x98 || in[i + 2] == 0x99)) {
+            out[o++] = '\''; // U+2018 / U+2019
+        } else if (seq == 3 && i + 2 < len && in[i] == 0xE2 && in[i + 1] == 0x80 &&
+                   (in[i + 2] == 0x9C || in[i + 2] == 0x9D)) {
+            out[o++] = '"'; // U+201C / U+201D
+        }
+        i += seq;
+    }
+    out[o] = '\0';
+}
+
 static void notify_work_cb(struct k_work *work) {
     if (update_cb) {
         update_cb();
@@ -47,9 +74,7 @@ static uint8_t read_cb(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_pa
     if (err) {
         LOG_WRN("Host name read failed (ATT err 0x%02x)", err);
     } else if (data && length > 0 && read_profile >= 0 && read_profile < NICEVIEW_PROFILE_COUNT) {
-        size_t n = MIN(length, HOST_NAME_MAX);
-        memcpy(names[read_profile], data, n);
-        names[read_profile][n] = '\0';
+        sanitize_name(data, length, names[read_profile], HOST_NAME_MAX);
         LOG_INF("Host name for profile %d: %s", read_profile, names[read_profile]);
         k_work_submit_to_queue(zmk_display_work_q(), &notify_work);
     }
