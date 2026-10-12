@@ -6,9 +6,9 @@ import sys, os, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 from PIL import Image, ImageDraw
 W, H = 68, 140
-# The right panel on this board shows the stock palette as a negative (the left
-# half's canvas comes out white on black too). Flip the art so Jack reads as
-# black ink on a light ground like the mock; set False for a standard nice!view.
+# With the stock palette this board showed the art as a negative while the
+# canvas-drawn strip was fine. Flipping the data fixed it on the screen; cause
+# not found. Set False if a new board shows Jack as a negative again.
 INVERT = True
 
 def to_lvgl(bits, name):
