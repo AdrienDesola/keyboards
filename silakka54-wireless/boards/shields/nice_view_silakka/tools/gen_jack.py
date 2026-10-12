@@ -128,13 +128,12 @@ def main(outdir):
            " * eyes closed and Zs added by tools/gen_jack.py. Stored in the 140x68 buffer",
            " * orientation like the stock balloon/mountain.", " *", " * SPDX-License-Identifier: MIT", " */", "",
            "#include <lvgl.h>", "", "#ifndef LV_ATTRIBUTE_MEM_ALIGN", "#define LV_ATTRIBUTE_MEM_ALIGN", "#endif"]
-    src = hdr[:]; js = {}
+    src = hdr[:]
     for n, b in frames.items():
         src.append(to_lvgl(b, n))
-        js[n] = ["".join(str(p) for p in row) for row in b]
         preview(b, os.path.join(outdir, f'preview_{n}.png'))
     open(os.path.join(HERE, '..', 'widgets', 'art.c'), 'w').write("\n".join(src))
-        sheet = Image.new('L', (W*4*5 + 40, H*4), 128)
+    sheet = Image.new('L', (W*4*5 + 40, H*4), 128)
     for i, n in enumerate(frames):
         sheet.paste(Image.open(os.path.join(outdir, f'preview_{n}.png')).convert('L'), (i*(W*4+8)+8, 0))
     sheet.save(os.path.join(outdir, 'preview_sheet.png'))
