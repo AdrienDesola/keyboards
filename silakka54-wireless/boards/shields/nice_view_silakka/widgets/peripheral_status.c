@@ -1,8 +1,8 @@
 /*
  * Right-half status: battery and link state in the top strip, Jack Skellington
  * below. Awake while linked (a short blink every ART_BLINK_MS while this half
- * is being typed on; a blink and a bat flap every ART_IDLE_MS otherwise),
- * asleep in his coffin while not linked (the Zs drift once every ART_IDLE_MS).
+ * is being typed on; a blink and a minute in another pose every ART_IDLE_MS
+ * otherwise), asleep while not linked (Zs show for a second every ART_IDLE_MS).
  * Every move is one or two redraws; nothing runs between them.
  *
  * SPDX-License-Identifier: MIT
@@ -29,12 +29,12 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 LV_IMG_DECLARE(jack_a);   // awake, eyes open
 LV_IMG_DECLARE(jack_b);   // awake, blink
-LV_IMG_DECLARE(jack_c);   // awake, bat wings down
+LV_IMG_DECLARE(jack_c);   // awake, other pose (held a minute every ART_IDLE_MS)
 LV_IMG_DECLARE(coffin_a); // asleep
 LV_IMG_DECLARE(coffin_b); // asleep, Zs drifted up
 
 #define BLINK_HOLD_MS 250
-#define FLAP_HOLD_MS 600
+#define POSE_HOLD_MS 60000
 #define ZZ_HOLD_MS 1000
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
@@ -129,7 +129,7 @@ static void motion_work_cb(struct k_work *work) {
         }
         return;
     }
-    // awake and idle: blink, bat flaps, back to still
+    // awake and idle: blink, change pose for a minute, back
     switch (step) {
     case 0:
         lv_img_set_src(art, &jack_b);
@@ -139,7 +139,7 @@ static void motion_work_cb(struct k_work *work) {
     case 1:
         lv_img_set_src(art, &jack_c);
         step = 2;
-        schedule(FLAP_HOLD_MS);
+        schedule(POSE_HOLD_MS);
         break;
     default:
         lv_img_set_src(art, &jack_a);

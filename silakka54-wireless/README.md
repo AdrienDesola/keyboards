@@ -28,6 +28,9 @@ a few seconds after it connects (Apple devices give the real name once bonded); 
 the fallback comes from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (comma separated, profile 1 first). A name wider than the
 screen scrolls through once when it appears, one step every `CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS`, then parks at its start;
 the pass pauses while ZMK is idle. Both halves draw a Bluetooth badge for a live link.
-The right half shows Jack Skellington (`widgets/art.c`, drawn at 8x and downsampled by `tools/gen_art.py`, needs Pillow): awake while linked, a short blink every
-`CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS` while that half is typed on and a blink plus bat flap every `CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS`
-when idle; asleep in his coffin while not linked, the Zs drifting once per idle period.
+The right half shows Jack Skellington (`widgets/art.c`): awake while linked, a short blink every
+`CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS` while that half is typed on and a blink plus a minute in another pose every
+`CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS` when idle; asleep while not linked, Zs showing once per idle period.
+The frames come from two illustrations fitted to 68x140 and Bayer-dithered by `tools/img2art.py` (sources in `tools/src/`);
+`tools/gen_jack.py` closes the eyes, adds the Zs and writes `art.c`. Both need Pillow. To swap the art, drop a new
+68x140 one-bit PNG in `tools/src/` and rerun `gen_jack.py`.
