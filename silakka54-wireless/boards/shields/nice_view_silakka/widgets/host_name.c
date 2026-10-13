@@ -35,6 +35,32 @@ static void settings_key(int profile, char *out, size_t out_max) {
     snprintf(out, out_max, SETTINGS_PREFIX "/%d", profile);
 }
 
+/* Flash writes wait for a radio-free window, so they must never run on the
+ * Bluetooth receive thread (where the name arrives) nor on the display
+ * thread. Both paths hand the write to the system work queue. */
+static char pending_name[HOST_NAME_MAX + 1];
+static int pending_profile = -1;
+static uint32_t delete_mask;
+
+static void store_work_cb(struct k_work *work) {
+    char key[16];
+    uint32_t mask = delete_mask;
+    delete_mask = 0;
+    for (int i = 0; i < NICEVIEW_PROFILE_COUNT; ++i) {
+        if (mask & BIT(i)) {
+            settings_key(i, key, sizeof(key));
+            settings_delete(key);
+        }
+    }
+    int profile = pending_profile;
+    pending_profile = -1;
+    if (profile >= 0 && profile < NICEVIEW_PROFILE_COUNT) {
+        settings_key(profile, key, sizeof(key));
+        settings_save_one(key, pending_name, strlen(pending_name));
+    }
+}
+K_WORK_DEFINE(store_work, store_work_cb);
+
 static int host_name_settings_set(const char *name, size_t len, settings_read_cb read_cb,
                                   void *cb_arg) {
     if (name == NULL || name[0] < '0' || name[0] > '9') {
@@ -112,9 +138,9 @@ static uint8_t read_cb(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_pa
         if (strcmp(fresh, names[read_profile]) != 0) {
             strcpy(names[read_profile], fresh);
             LOG_INF("Host name for profile %d: %s", read_profile, fresh);
-            char key[16];
-            settings_key(read_profile, key, sizeof(key));
-            settings_save_one(key, fresh, strlen(fresh));
+            strcpy(pending_name, fresh);
+            pending_profile = read_profile;
+            k_work_submit(&store_work);
         }
         k_work_submit_to_queue(zmk_display_work_q(), &notify_work);
     }
@@ -161,9 +187,8 @@ void host_name_request(int profile) {
 void host_name_clear(int profile) {
     if (profile >= 0 && profile < NICEVIEW_PROFILE_COUNT && names[profile][0] != '\0') {
         names[profile][0] = '\0';
-        char key[16];
-        settings_key(profile, key, sizeof(key));
-        settings_delete(key);
+        delete_mask |= BIT(profile);
+        k_work_submit(&store_work);
     }
 }
 
