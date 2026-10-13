@@ -183,10 +183,10 @@ static const char *middle_name(const struct status_state *state, int i) {
     if (host[0] != '\0') {
         return host;
     }
-    if (profile_names[i][0] != '\0') {
-        return profile_names[i];
+    if (!state->profiles_bonded[i]) {
+        return "open";
     }
-    return state->profiles_bonded[i] ? "" : "open";
+    return profile_names[i];
 }
 
 static lv_coord_t text_width(const char *text, const lv_font_t *font) {
