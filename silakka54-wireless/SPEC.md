@@ -26,12 +26,14 @@ Source of truth for what this firmware does. Change behavior, change this file i
 
 ## Bluetooth profiles
 
+- Slots in use (2026-10-13): 1 = work MacBook Pro, 2 = personal MacBook Air.
 - Five host slots. Only the active slot advertises. Links on other slots stay up; only the active one receives keys.
 - Clearing a slot drops its bond and starts advertising. The host must then forget the keyboard and pair again.
 - A host that keeps old keys after the keyboard cleared the slot links at radio level but cannot encrypt:
   the keyboard shows no link, the host receives nothing. Forgetting on the host fixes it.
 - Pairing is started by the host. The keyboard never asks for it. A host that links and never pairs sits
-  unpaired with the slot still open (seen with a managed work MacBook, cause on the host side, unresolved).
+  unpaired with the slot still open. Seen with a work MacBook Pro whose Bluetooth stack was stuck: it linked,
+  negotiated connection parameters, never sent a pairing request. Rebooting that Mac fixed it.
 
 ## Left display
 
@@ -84,6 +86,4 @@ Source of truth for what this firmware does. Change behavior, change this file i
 
 ## Open
 
-- Work MacBook links on slot 2 and never pairs. Next: check management profiles, restart its Bluetooth daemon,
-  confirm it pairs other devices.
 - Old repo `AdrienDesola/silakka54-zmk-config` still to delete.
