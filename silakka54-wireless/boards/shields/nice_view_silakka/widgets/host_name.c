@@ -2,11 +2,14 @@
  * SPDX-License-Identifier: MIT
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
+#include <zephyr/settings/settings.h>
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -21,6 +24,36 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static char names[NICEVIEW_PROFILE_COUNT][HOST_NAME_MAX + 1];
 static host_name_update_cb_t update_cb;
+
+/* Names persist in the settings area under nv_host/<profile>, so a slot keeps
+ * its host's name across deep sleep and reboots until the bond is cleared.
+ * ZMK runs settings_load() before the display comes up, so the first draw
+ * already sees them. */
+#define SETTINGS_PREFIX "nv_host"
+
+static void settings_key(int profile, char *out, size_t out_max) {
+    snprintf(out, out_max, SETTINGS_PREFIX "/%d", profile);
+}
+
+static int host_name_settings_set(const char *name, size_t len, settings_read_cb read_cb,
+                                  void *cb_arg) {
+    if (name == NULL || name[0] < '0' || name[0] > '9') {
+        return -ENOENT;
+    }
+    int profile = atoi(name);
+    if (profile < 0 || profile >= NICEVIEW_PROFILE_COUNT || len > HOST_NAME_MAX) {
+        return -EINVAL;
+    }
+    ssize_t rc = read_cb(cb_arg, names[profile], len);
+    if (rc < 0) {
+        names[profile][0] = '\0';
+        return rc;
+    }
+    names[profile][rc] = '\0';
+    return 0;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(nv_host, SETTINGS_PREFIX, NULL, host_name_settings_set, NULL, NULL);
 
 static struct bt_conn *read_conn;
 static int read_profile = -1;
@@ -74,8 +107,15 @@ static uint8_t read_cb(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_pa
     if (err) {
         LOG_WRN("Host name read failed (ATT err 0x%02x)", err);
     } else if (data && length > 0 && read_profile >= 0 && read_profile < NICEVIEW_PROFILE_COUNT) {
-        sanitize_name(data, length, names[read_profile], HOST_NAME_MAX);
-        LOG_INF("Host name for profile %d: %s", read_profile, names[read_profile]);
+        char fresh[HOST_NAME_MAX + 1];
+        sanitize_name(data, length, fresh, HOST_NAME_MAX);
+        if (strcmp(fresh, names[read_profile]) != 0) {
+            strcpy(names[read_profile], fresh);
+            LOG_INF("Host name for profile %d: %s", read_profile, fresh);
+            char key[16];
+            settings_key(read_profile, key, sizeof(key));
+            settings_save_one(key, fresh, strlen(fresh));
+        }
         k_work_submit_to_queue(zmk_display_work_q(), &notify_work);
     }
     finish_read();
@@ -84,7 +124,7 @@ static uint8_t read_cb(struct bt_conn *conn, uint8_t err, struct bt_gatt_read_pa
 
 static void read_work_cb(struct k_work *work) {
     int profile = zmk_ble_active_profile_index();
-    if (profile < 0 || profile >= NICEVIEW_PROFILE_COUNT || names[profile][0] != '\0' ||
+    if (profile < 0 || profile >= NICEVIEW_PROFILE_COUNT ||
         !zmk_ble_active_profile_is_connected() || read_conn != NULL) {
         return;
     }
@@ -112,15 +152,18 @@ static void read_work_cb(struct k_work *work) {
 K_WORK_DELAYABLE_DEFINE(read_work, read_work_cb);
 
 void host_name_request(int profile) {
-    if (profile < 0 || profile >= NICEVIEW_PROFILE_COUNT || names[profile][0] != '\0') {
+    if (profile < 0 || profile >= NICEVIEW_PROFILE_COUNT) {
         return;
     }
     k_work_reschedule(&read_work, HOST_NAME_READ_DELAY);
 }
 
 void host_name_clear(int profile) {
-    if (profile >= 0 && profile < NICEVIEW_PROFILE_COUNT) {
+    if (profile >= 0 && profile < NICEVIEW_PROFILE_COUNT && names[profile][0] != '\0') {
         names[profile][0] = '\0';
+        char key[16];
+        settings_key(profile, key, sizeof(key));
+        settings_delete(key);
     }
 }
 

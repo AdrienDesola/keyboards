@@ -42,8 +42,11 @@ Source of truth for what this firmware does. Change behavior, change this file i
   profile is empty, cross when bonded but away.
 - Middle: active profile only. Filled disc with the slot number, always drawn. Thin outer ring: solid when the
   host is linked, dashed when bonded but away, absent when the slot is empty.
-- Name under the disc: the host's Bluetooth name read over GATT once linked and bonded; otherwise the configured
-  label for that slot from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` when the slot is bonded; `open` when it is empty.
+- Name under the disc: the host's Bluetooth name, read over GATT a few seconds after each link and saved in the
+  settings area under `nv_host/<slot>`. It stays while the host is away, through deep sleep and reboots, and goes
+  with the bond when the slot is cleared or `settings_reset` runs. A changed host name replaces the saved one on the
+  next link. Bonded slot with no name yet: the label from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (unset, so blank).
+  Empty slot: `open`.
   A name wider than the screen scrolls once, one step per `CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS`, then parks.
 - Bottom: WPM graph, fixed scale 0 to `CONFIG_NICE_VIEW_SILAKKA_WPM_MAX`, grid, peak since power-on.
 - Polarity: black text on white.

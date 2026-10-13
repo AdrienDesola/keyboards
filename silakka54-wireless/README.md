@@ -25,9 +25,10 @@ After editing in Studio, keymap file changes are ignored until "Restore Stock Se
 `boards/shields/nice_view_silakka/` is the stock nice!view shield with three changes on the left half:
 a Bluetooth glyph instead of the wifi-looking arcs, a WPM graph on a fixed 0–`CONFIG_NICE_VIEW_SILAKKA_WPM_MAX` scale with a grid and the peak since power-on,
 and only the active Bluetooth profile shown, with its name. The name is read from the host's GAP Device Name over GATT
-a few seconds after it connects (Apple devices give the real name once bonded); until then, or if the host has none,
-the fallback comes from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (comma separated, profile 1 first). A profile with no bond
-reads `open` whatever its configured name. A name wider than the
+a few seconds after it connects (Apple devices give the real name once bonded) and saved in the settings area, so it
+stays on screen while the host is away, through sleep and reboots, until the profile is cleared. Before the first read,
+or if the host has no name, the fallback is `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (comma separated, profile 1 first,
+unset by default). A profile with no bond reads `open`. A name wider than the
 screen scrolls through once when it appears, one step every `CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS`, then parks at its start;
 the pass pauses while ZMK is idle. Both halves draw a Bluetooth badge for a live link.
 The right half shows Jack Skellington (`widgets/art.c`): awake while linked, a short blink every
