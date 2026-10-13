@@ -1,6 +1,7 @@
 # Silakka54 wireless (ZMK)
 
 ZMK firmware for the PandaKB Silakka54 MX wireless (nice!nano-compatible controller, Sharp/nice!view display).
+What the firmware must do, and which commit runs on each half, is in `SPEC.md`.
 Keymap read off the old Vial Silakka54 (VIA raw HID dump), newer than `silakka54.vil` in [AdrienDesola/crkbd](https://github.com/AdrienDesola/crkbd).
 
 Native `silakka54` shield in `boards/shields/silakka54/`: Lily58 pin wiring (what the PandaKB
