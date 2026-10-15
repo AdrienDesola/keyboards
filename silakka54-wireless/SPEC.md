@@ -67,6 +67,7 @@ Source of truth for what this firmware does. Change behavior, change this file i
 
 - Deep sleep after 30 min idle, not while on USB.
 - Battery of the right half is fetched by the left and proxied to the host.
+- Radio transmit power is the ZMK default, 0 dBm. Both halves sit on one desk, so the earlier +8 dBm bought range nothing needed at three times the transmit current on the left half, which transmits every 7.5 ms as the split central.
 
 ## Build, flash, versions
 
