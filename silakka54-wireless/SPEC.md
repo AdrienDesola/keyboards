@@ -65,9 +65,10 @@ Source of truth for what this firmware does. Change behavior, change this file i
 
 ## Power
 
-- Deep sleep after 30 min idle, not while on USB.
+- Deep sleep after 15 min idle (ZMK default), not while on USB. Wake is a key press plus about a second to relink.
 - Battery of the right half is fetched by the left and proxied to the host.
 - Radio transmit power is the ZMK default, 0 dBm. Both halves sit on one desk, so the earlier +8 dBm bought range nothing needed at three times the transmit current on the left half, which transmits every 7.5 ms as the split central.
+- Radio and display timing stay at ZMK defaults (split connection interval 7.5 ms, display tick 10 ms). Tuning them trades latency for battery and was declined.
 
 ## Build, flash, versions
 
