@@ -22,23 +22,17 @@ After editing in Studio, keymap file changes are ignored until "Restore Stock Se
 
 ## Status screen
 
-`boards/shields/nice_view_silakka/` is the stock nice!view shield with three changes on the left half:
-a Bluetooth glyph instead of the wifi-looking arcs, a WPM graph on a fixed 0–`CONFIG_NICE_VIEW_SILAKKA_WPM_MAX` scale with a grid and the peak since power-on,
-and only the active Bluetooth profile shown, with its name. The name is read from the host's GAP Device Name over GATT
-a few seconds after it connects (Apple devices give the real name once bonded) and saved in the settings area, so it
-stays on screen while the host is away, through sleep and reboots, until the profile is cleared. Before the first read,
-or if the host has no name, the fallback is `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (comma separated, profile 1 first,
-unset by default). A profile with no bond reads `open`. A name wider than the
-screen scrolls through once when it appears, one step every `CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS`, then parks at its start;
-the pass pauses while ZMK is idle. Both halves draw a Bluetooth badge for a live link.
-The right half shows Jack Skellington (`widgets/art.c`): awake while linked, a short blink every
-`CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS` while that half is typed on and a blink plus a minute in another pose every
-`CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS` when idle; asleep while not linked, Zs showing once per idle period.
-The frames come from two illustrations fitted to 68x140 and Bayer-dithered by `tools/img2art.py` (sources in `tools/src/`);
-`tools/gen_jack.py` closes the eyes, adds the Zs and writes `art.c`. Both need Pillow. To swap the art, drop a new
-68x140 one-bit PNG in `tools/src/` and rerun `gen_jack.py`.
+`boards/shields/nice_view_silakka/` is the stock nice!view shield reworked. Left half, top to bottom: battery and
+output, the active Bluetooth profile with its host's name (read over GATT, saved in settings, scrolls once when
+wider than the screen, `open` for an empty slot), an 80-row stage, the layer name in small type. Right half: battery
+and link to the left half, then a 140-row stage.
 
-The right half can also play short flipbook clips: at power-on, when the halves link, and when typing stops.
-`tools/vid2clip.py <video> <name> --start S --duration D --fps 12` turns any video into `clip_<name>.c`
-(run-length frames, XOR deltas, about 100 to 900 bytes a frame depending on how flat the art is);
-drop it in `widgets/` and point `widgets/clips.c` at it. Needs ffmpeg and Pillow.
+The stages are themed. `themes/<name>/left/` and `themes/<name>/right/` each hold a `theme.c` that names a resting
+still, optional blink, pose and asleep stills, and optional flipbook clips for power-on, link and idle.
+Set `CONFIG_NICE_VIEW_SILAKKA_THEME` in `silakka54.conf` and reflash both halves; only the chosen theme, and only
+each half's own part of it, is compiled. See `SPEC.md`, section Themes, for the exact behaviour.
+
+Making art: `tools/img2art.py` fits a picture into one-bit stills; `tools/vid2clip.py <video> <name> --start S
+--duration D --fps 12 --size 68x140` (or `68x80` for the left) turns video into `clip_<name>.c` (run-length frames,
+XOR deltas, about 100 to 900 bytes a frame depending on how flat the art is). Both need Pillow, the clip tool ffmpeg.
+`tools/gen_jack.py` rebuilds the jack theme's right-half stills.

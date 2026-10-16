@@ -1,13 +1,6 @@
 /*
- * Right-half status: battery and link state in the top strip, Jack Skellington
- * below. Awake while linked (a short blink every ART_BLINK_MS while this half
- * is being typed on; a blink and a minute in another pose every ART_IDLE_MS
- * otherwise), asleep while not linked (Zs show for a second every ART_IDLE_MS).
- * Every move is one or two redraws; nothing runs between them.
- *
- * With CONFIG_NICE_VIEW_SILAKKA_CLIP, a flipbook clip (clips.c) plays at power-on,
- * at link and at idle; the motion above resumes after its last frame. A key
- * press or a lost link cuts it short.
+ * Right-half status: battery and link state in the top strip, the theme's
+ * stage below (stage.c, themes/<name>/right/).
  *
  * SPDX-License-Identifier: MIT
  */
@@ -17,10 +10,8 @@
 #include <zephyr/logging/log.h>
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
-#include <zmk/activity.h>
 #include <zmk/battery.h>
 #include <zmk/display.h>
-#include <zmk/events/activity_state_changed.h>
 #include <zmk/events/usb_conn_state_changed.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/battery_state_changed.h>
@@ -31,32 +22,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include "peripheral_status.h"
 
-#if IS_ENABLED(CONFIG_NICE_VIEW_SILAKKA_CLIP)
-#include "clips.h"
-#else
-struct clip;
-#define clip_boot NULL
-#define clip_link NULL
-#define clip_idle NULL
-#define clip_playing() false
-#define clip_stop()
-#endif
-
-LV_IMG_DECLARE(jack_a);   // awake, eyes open
-LV_IMG_DECLARE(jack_b);   // awake, blink
-LV_IMG_DECLARE(jack_c);   // awake, other pose (held a minute every ART_IDLE_MS)
-LV_IMG_DECLARE(coffin_a); // asleep
-LV_IMG_DECLARE(coffin_b); // asleep, Zs drifted up
-
-#define BLINK_HOLD_MS 250
-#define POSE_HOLD_MS 60000
-#define ZZ_HOLD_MS 1000
+#include "stage.h"
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
-static lv_obj_t *art;
-static bool linked;
-static bool typing = true;
-static int step; // position in the current motion sequence
 
 struct peripheral_status_state {
     bool connected;
@@ -86,120 +54,6 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
     // Rotate canvas
     rotate_canvas(canvas, cbuf);
 }
-
-/* ---- motion ---------------------------------------------------------- */
-
-static void motion_work_cb(struct k_work *work);
-K_WORK_DELAYABLE_DEFINE(motion_work, motion_work_cb);
-
-static void schedule(int ms) {
-    if (ms > 0) {
-        k_work_schedule_for_queue(zmk_display_work_q(), &motion_work, K_MSEC(ms));
-    }
-}
-
-static void restart_motion(void) {
-    step = 0;
-    k_work_cancel_delayable(&motion_work);
-    if (!art) {
-        return;
-    }
-    lv_img_set_src(art, linked ? &jack_a : &coffin_a);
-    if (!linked) {
-        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
-    } else if (typing) {
-        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS);
-    } else {
-        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
-    }
-}
-
-/* A clip replaces the motion until its last frame, then restart_motion() takes over. */
-static void start_clip(const struct clip *clip) {
-#if IS_ENABLED(CONFIG_NICE_VIEW_SILAKKA_CLIP)
-    if (art && clip) {
-        k_work_cancel_delayable(&motion_work);
-        clip_play(art, clip, restart_motion);
-        return;
-    }
-#endif
-    restart_motion();
-}
-
-static void motion_work_cb(struct k_work *work) {
-    if (!art || clip_playing()) {
-        return;
-    }
-    if (!linked) {
-        // asleep: Zs up for a second, then back
-        if (step == 0) {
-            lv_img_set_src(art, &coffin_b);
-            step = 1;
-            schedule(ZZ_HOLD_MS);
-        } else {
-            lv_img_set_src(art, &coffin_a);
-            step = 0;
-            schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
-        }
-        return;
-    }
-    if (typing) {
-        // awake and in use: blink
-        if (step == 0) {
-            lv_img_set_src(art, &jack_b);
-            step = 1;
-            schedule(BLINK_HOLD_MS);
-        } else {
-            lv_img_set_src(art, &jack_a);
-            step = 0;
-            schedule(CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS);
-        }
-        return;
-    }
-    // awake and idle: blink, change pose for a minute, back
-    switch (step) {
-    case 0:
-        lv_img_set_src(art, &jack_b);
-        step = 1;
-        schedule(BLINK_HOLD_MS);
-        break;
-    case 1:
-        lv_img_set_src(art, &jack_c);
-        step = 2;
-        schedule(POSE_HOLD_MS);
-        break;
-    default:
-        lv_img_set_src(art, &jack_a);
-        step = 0;
-        schedule(CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS);
-        break;
-    }
-}
-
-static int activity_listener(const zmk_event_t *eh) {
-    const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
-    if (ev == NULL) {
-        return ZMK_EV_EVENT_BUBBLE;
-    }
-    bool now_typing = ev->state == ZMK_ACTIVITY_ACTIVE;
-    if (now_typing == typing) {
-        return ZMK_EV_EVENT_BUBBLE;
-    }
-    typing = now_typing;
-    if (typing) {
-        clip_stop(); // a key press cuts any clip short
-        restart_motion();
-    } else if (clip_playing()) {
-        // let it finish; restart_motion() reads the new state afterwards
-    } else if (linked) {
-        start_clip(clip_idle);
-    } else {
-        restart_motion();
-    }
-    return ZMK_EV_EVENT_BUBBLE;
-}
-ZMK_LISTENER(widget_art_motion, activity_listener);
-ZMK_SUBSCRIPTION(widget_art_motion, zmk_activity_state_changed);
 
 /* ---- battery --------------------------------------------------------- */
 
@@ -247,16 +101,6 @@ static void set_connection_status(struct zmk_widget_status *widget,
     widget->state.connected = state.connected;
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
-
-    if (state.connected != linked) {
-        linked = state.connected;
-        if (!linked) {
-            clip_stop();
-            restart_motion();
-        } else if (!clip_playing()) {
-            start_clip(clip_link);
-        }
-    }
 }
 
 static void output_status_update_cb(struct peripheral_status_state state) {
@@ -275,14 +119,13 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     lv_obj_align(top, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_canvas_set_buffer(top, widget->cbuf, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
 
-    art = lv_img_create(widget->obj);
+    lv_obj_t *art = lv_img_create(widget->obj);
     lv_obj_align(art, LV_ALIGN_TOP_LEFT, 0, 0);
 
     sys_slist_append(&widgets, &widget->node);
     widget_battery_status_init();
     widget_peripheral_status_init();
-    linked = zmk_split_bt_peripheral_is_connected();
-    start_clip(clip_boot);
+    stage_init(art, &theme_side);
 
     return 0;
 }

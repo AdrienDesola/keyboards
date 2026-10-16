@@ -1,4 +1,4 @@
-"""Build widgets/art.c: five animation frames from the two Bayer bitmaps in src/.
+"""Build themes/jack/right/art.c: five animation frames from the two Bayer bitmaps in src/.
 Usage: python3 gen_jack.py   (needs Pillow). Make new src/*.png with img2art.py.
 jack_a/b: staff pose open/blink; jack_c: classic bust (pose change);
 coffin_a/b: classic bust asleep without/with Zs."""
@@ -138,7 +138,7 @@ def main(outdir):
             b = [[1 - p for p in row] for row in b]
         src.append(to_lvgl(b, n))
         preview(b, os.path.join(outdir, f'preview_{n}.png'))
-    open(os.path.join(HERE, '..', 'widgets', 'art.c'), 'w').write("\n".join(src))
+    open(os.path.join(HERE, '..', 'themes', 'jack', 'right', 'art.c'), 'w').write("\n".join(src))
     sheet = Image.new('L', (W*4*5 + 40, H*4), 128)
     for i, n in enumerate(frames):
         sheet.paste(Image.open(os.path.join(outdir, f'preview_{n}.png')).convert('L'), (i*(W*4+8)+8, 0))

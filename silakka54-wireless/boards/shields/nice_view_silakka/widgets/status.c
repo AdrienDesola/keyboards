@@ -1,8 +1,11 @@
 /*
+ * Left-half status, top to bottom as the user sees it: battery and output in
+ * the first rows, the active Bluetooth profile ring with its host name below,
+ * the theme's stage (80 px, stage.c, themes/<name>/left/), the layer name in a
+ * thin strip at the bottom.
  *
  * Copyright (c) 2025 The ZMK Contributors
  * SPDX-License-Identifier: MIT
- *
  */
 
 #include <zephyr/kernel.h>
@@ -14,24 +17,24 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/display.h>
 #include "status.h"
 #include "host_name.h"
+#include "stage.h"
 #include <zmk/events/usb_conn_state_changed.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
-#include <zmk/events/wpm_state_changed.h>
 #include <zmk/events/layer_state_changed.h>
 #include <zmk/usb.h>
 #include <zmk/ble.h>
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
-#include <zmk/wpm.h>
 #include <zmk/activity.h>
 #include <zmk/events/activity_state_changed.h>
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
 static lv_coord_t text_width(const char *text, const lv_font_t *font);
+static void draw_profile(lv_obj_t *canvas, const struct status_state *state);
 
 struct output_status_state {
     struct zmk_endpoint_instance selected_endpoint;
@@ -47,23 +50,13 @@ struct layer_status_state {
     const char *label;
 };
 
-struct wpm_status_state {
-    uint8_t wpm;
-};
-
 static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
     lv_obj_t *canvas = lv_obj_get_child(widget, 0);
 
     lv_draw_label_dsc_t label_dsc;
     init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_montserrat_16, LV_TEXT_ALIGN_RIGHT);
-    lv_draw_label_dsc_t label_dsc_wpm;
-    init_label_dsc(&label_dsc_wpm, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_RIGHT);
     lv_draw_rect_dsc_t rect_black_dsc;
     init_rect_dsc(&rect_black_dsc, LVGL_BACKGROUND);
-    lv_draw_rect_dsc_t rect_white_dsc;
-    init_rect_dsc(&rect_white_dsc, LVGL_FOREGROUND);
-    lv_draw_line_dsc_t line_dsc;
-    init_line_dsc(&line_dsc, LVGL_FOREGROUND, 2);
 
     // Fill background
     lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);
@@ -95,47 +88,7 @@ static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_st
         draw_bt_badge(canvas, CANVAS_SIZE - 14, 1);
     }
 
-    // Draw WPM
-    lv_canvas_draw_rect(canvas, 0, 21, 68, 42, &rect_white_dsc);
-    lv_canvas_draw_rect(canvas, 1, 22, 66, 40, &rect_black_dsc);
-
-    // Grid: rows at 1/4, 1/2, 3/4 of the scale, columns every two samples
-    lv_draw_line_dsc_t grid_dsc;
-    init_line_dsc(&grid_dsc, LVGL_FOREGROUND, 1);
-    for (int k = 1; k <= 3; k++) {
-        int y = 60 - 36 * k / 4;
-        lv_point_t row[2] = {{2, y}, {65, y}};
-        lv_canvas_draw_line(canvas, row, 2, &grid_dsc);
-    }
-    for (int i = 2; i <= 8; i += 2) {
-        int x = 2 + i * 7;
-        lv_point_t col[2] = {{x, 24}, {x, 60}};
-        lv_canvas_draw_line(canvas, col, 2, &grid_dsc);
-    }
-
-    // Current WPM, bottom-right, on a cleared patch so the grid stays out of the digits
-    char wpm_text[6] = {};
-    snprintf(wpm_text, sizeof(wpm_text), "%d", state->wpm[9]);
-    lv_coord_t wpm_w = text_width(wpm_text, &lv_font_unscii_8);
-    lv_canvas_draw_rect(canvas, 66 - wpm_w - 2, 51, wpm_w + 3, 10, &rect_black_dsc);
-    lv_canvas_draw_text(canvas, 42, 52, 24, &label_dsc_wpm, wpm_text);
-
-    // Peak since power-on, top-left, same cleared patch
-    lv_draw_label_dsc_t label_dsc_max;
-    init_label_dsc(&label_dsc_max, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_LEFT);
-    char max_text[10] = {};
-    snprintf(max_text, sizeof(max_text), "MAX %d", state->wpm_max);
-    lv_coord_t max_w = text_width(max_text, &lv_font_unscii_8);
-    lv_canvas_draw_rect(canvas, 2, 23, max_w + 3, 10, &rect_black_dsc);
-    lv_canvas_draw_text(canvas, 3, 24, 60, &label_dsc_max, max_text);
-
-    lv_point_t points[10];
-    for (int i = 0; i < 10; i++) {
-        int wpm = MIN(state->wpm[i], CONFIG_NICE_VIEW_SILAKKA_WPM_MAX);
-        points[i].x = 2 + i * 7;
-        points[i].y = 60 - wpm * 36 / CONFIG_NICE_VIEW_SILAKKA_WPM_MAX;
-    }
-    lv_canvas_draw_line(canvas, points, 10, &line_dsc);
+    draw_profile(canvas, state);
 
     // Rotate canvas
     rotate_canvas(canvas, cbuf);
@@ -164,16 +117,19 @@ static void parse_profile_names(void) {
 
 #define NAME_GAP 16
 
+/* Screen rows as the user sees it: 68 status, 80 stage, LAYER_STRIP layer. */
+#define LAYER_STRIP 12
+
 static int name_scroll_offset;
 static int name_scroll_remaining; /* pixels left in the single pass, 0 = parked */
 static char scrolled_name[32];
 static bool keyboard_active = true;
-static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state);
+static void draw_top(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state);
 
 static void scroll_work_cb(struct k_work *work) {
     struct zmk_widget_status *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
-        draw_middle(widget->obj, widget->cbuf2, &widget->state);
+        draw_top(widget->obj, widget->cbuf, &widget->state);
     }
 }
 K_WORK_DELAYABLE_DEFINE(scroll_work, scroll_work_cb);
@@ -195,11 +151,9 @@ static lv_coord_t text_width(const char *text, const lv_font_t *font) {
     return size.x;
 }
 
-static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
-    lv_obj_t *canvas = lv_obj_get_child(widget, 1);
-
-    lv_draw_rect_dsc_t rect_black_dsc;
-    init_rect_dsc(&rect_black_dsc, LVGL_BACKGROUND);
+/* Active profile under the battery row: ring shows its state, number inside,
+ * host name below. Drawn into the top square, which the caller rotates. */
+static void draw_profile(lv_obj_t *canvas, const struct status_state *state) {
     lv_draw_arc_dsc_t arc_dsc;
     init_arc_dsc(&arc_dsc, LVGL_FOREGROUND, 2);
     lv_draw_arc_dsc_t arc_dsc_filled;
@@ -209,12 +163,9 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
     lv_draw_label_dsc_t label_dsc_name;
     init_label_dsc(&label_dsc_name, LVGL_FOREGROUND, &lv_font_montserrat_14, LV_TEXT_ALIGN_CENTER);
 
-    // Fill background
-    lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);
-
-    // Only the active profile: ring shows its state, number inside, name below
     const int i = state->active_profile_index;
-    const int cx = 34, cy = 17;
+    const int cx = 34, cy = 33;
+    const int name_y = 50;
 
     if (i >= 0 && i < NICEVIEW_PROFILE_COUNT) {
         if (state->profiles_connected[i]) {
@@ -242,7 +193,7 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
             name_scroll_remaining = w + NAME_GAP;
         }
         if (w <= CANVAS_SIZE || CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS == 0) {
-            lv_canvas_draw_text(canvas, 0, 36, CANVAS_SIZE, &label_dsc_name, name);
+            lv_canvas_draw_text(canvas, 0, name_y, CANVAS_SIZE, &label_dsc_name, name);
         } else {
             // Wider than the screen: marquee, the text drawn twice with a gap so it loops
             lv_draw_label_dsc_t label_dsc_left;
@@ -250,8 +201,8 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
                            LV_TEXT_ALIGN_LEFT);
             int period = w + NAME_GAP;
             name_scroll_offset %= period;
-            lv_canvas_draw_text(canvas, -name_scroll_offset, 36, w + 2, &label_dsc_left, name);
-            lv_canvas_draw_text(canvas, period - name_scroll_offset, 36, w + 2, &label_dsc_left,
+            lv_canvas_draw_text(canvas, -name_scroll_offset, name_y, w + 2, &label_dsc_left, name);
+            lv_canvas_draw_text(canvas, period - name_scroll_offset, name_y, w + 2, &label_dsc_left,
                                 name);
             if (keyboard_active && name_scroll_remaining > 0) {
                 name_scroll_offset += 2;
@@ -265,18 +216,16 @@ static void draw_middle(lv_obj_t *widget, lv_color_t cbuf[], const struct status
             }
         }
     }
-
-    // Rotate canvas
-    rotate_canvas(canvas, cbuf);
 }
 
+/* Layer name in the bottom strip, small: only its first LAYER_STRIP rows show. */
 static void draw_bottom(lv_obj_t *widget, lv_color_t cbuf[], const struct status_state *state) {
-    lv_obj_t *canvas = lv_obj_get_child(widget, 2);
+    lv_obj_t *canvas = lv_obj_get_child(widget, 1);
 
     lv_draw_rect_dsc_t rect_black_dsc;
     init_rect_dsc(&rect_black_dsc, LVGL_BACKGROUND);
     lv_draw_label_dsc_t label_dsc;
-    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_montserrat_14, LV_TEXT_ALIGN_CENTER);
+    init_label_dsc(&label_dsc, LVGL_FOREGROUND, &lv_font_unscii_8, LV_TEXT_ALIGN_CENTER);
 
     // Fill background
     lv_canvas_draw_rect(canvas, 0, 0, CANVAS_SIZE, CANVAS_SIZE, &rect_black_dsc);
@@ -287,9 +236,9 @@ static void draw_bottom(lv_obj_t *widget, lv_color_t cbuf[], const struct status
 
         sprintf(text, "LAYER %i", state->layer_index);
 
-        lv_canvas_draw_text(canvas, 0, 5, 68, &label_dsc, text);
+        lv_canvas_draw_text(canvas, 0, 2, 68, &label_dsc, text);
     } else {
-        lv_canvas_draw_text(canvas, 0, 5, 68, &label_dsc, state->layer_label);
+        lv_canvas_draw_text(canvas, 0, 2, 68, &label_dsc, state->layer_label);
     }
 
     // Rotate canvas
@@ -352,13 +301,12 @@ static void set_output_status(struct zmk_widget_status *widget,
     }
 
     draw_top(widget->obj, widget->cbuf, &widget->state);
-    draw_middle(widget->obj, widget->cbuf2, &widget->state);
 }
 
 static void host_name_updated(void) {
     struct zmk_widget_status *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
-        draw_middle(widget->obj, widget->cbuf2, &widget->state);
+        draw_top(widget->obj, widget->cbuf, &widget->state);
     }
 }
 
@@ -396,7 +344,7 @@ static void set_layer_status(struct zmk_widget_status *widget, struct layer_stat
     widget->state.layer_index = state.index;
     widget->state.layer_label = state.label;
 
-    draw_bottom(widget->obj, widget->cbuf3, &widget->state);
+    draw_bottom(widget->obj, widget->cbuf2, &widget->state);
 }
 
 static void layer_status_update_cb(struct layer_status_state state) {
@@ -414,31 +362,6 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_layer_status, struct layer_status_state, laye
                             layer_status_get_state)
 
 ZMK_SUBSCRIPTION(widget_layer_status, zmk_layer_state_changed);
-
-static void set_wpm_status(struct zmk_widget_status *widget, struct wpm_status_state state) {
-    for (int i = 0; i < 9; i++) {
-        widget->state.wpm[i] = widget->state.wpm[i + 1];
-    }
-    widget->state.wpm[9] = state.wpm;
-    if (state.wpm > widget->state.wpm_max) {
-        widget->state.wpm_max = state.wpm;
-    }
-
-    draw_top(widget->obj, widget->cbuf, &widget->state);
-}
-
-static void wpm_status_update_cb(struct wpm_status_state state) {
-    struct zmk_widget_status *widget;
-    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) { set_wpm_status(widget, state); }
-}
-
-struct wpm_status_state wpm_status_get_state(const zmk_event_t *eh) {
-    return (struct wpm_status_state){.wpm = zmk_wpm_get_state()};
-};
-
-ZMK_DISPLAY_WIDGET_LISTENER(widget_wpm_status, struct wpm_status_state, wpm_status_update_cb,
-                            wpm_status_get_state)
-ZMK_SUBSCRIPTION(widget_wpm_status, zmk_wpm_state_changed);
 
 static int activity_listener(const zmk_event_t *eh) {
     const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
@@ -462,12 +385,11 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     lv_obj_t *top = lv_canvas_create(widget->obj);
     lv_obj_align(top, LV_ALIGN_TOP_RIGHT, 0, 0);
     lv_canvas_set_buffer(top, widget->cbuf, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
-    lv_obj_t *middle = lv_canvas_create(widget->obj);
-    lv_obj_align(middle, LV_ALIGN_TOP_LEFT, 24, 0);
-    lv_canvas_set_buffer(middle, widget->cbuf2, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
     lv_obj_t *bottom = lv_canvas_create(widget->obj);
-    lv_obj_align(bottom, LV_ALIGN_TOP_LEFT, -44, 0);
-    lv_canvas_set_buffer(bottom, widget->cbuf3, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
+    lv_obj_align(bottom, LV_ALIGN_TOP_LEFT, LAYER_STRIP - CANVAS_SIZE, 0);
+    lv_canvas_set_buffer(bottom, widget->cbuf2, CANVAS_SIZE, CANVAS_SIZE, LV_IMG_CF_TRUE_COLOR);
+    lv_obj_t *stage = lv_img_create(widget->obj);
+    lv_obj_align(stage, LV_ALIGN_TOP_LEFT, LAYER_STRIP, 0);
 
     parse_profile_names();
     host_name_set_update_cb(host_name_updated);
@@ -475,7 +397,7 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     widget_battery_status_init();
     widget_output_status_init();
     widget_layer_status_init();
-    widget_wpm_status_init();
+    stage_init(stage, &theme_side);
 
     return 0;
 }

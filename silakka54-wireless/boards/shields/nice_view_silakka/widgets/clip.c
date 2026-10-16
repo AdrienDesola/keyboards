@@ -10,24 +10,21 @@
 
 #include "clip.h"
 
-#define CLIP_W 140
-#define CLIP_H 68
-#define CLIP_STRIDE ((CLIP_W + 7) / 8)
-#define CLIP_PIXELS (CLIP_W * CLIP_H)
+#define MAX_W 140
+#define MAX_H 68
+#define MAX_STRIDE ((MAX_W + 7) / 8)
 #define PALETTE_BYTES 8
 #define MAX_FPS 15
 
 /* Same layout as the frames in art.c: LVGL indexed 1-bit, palette first. */
-static uint8_t buf[PALETTE_BYTES + CLIP_STRIDE * CLIP_H];
-static const lv_img_dsc_t clip_img = {
+static uint8_t buf[PALETTE_BYTES + MAX_STRIDE * MAX_H];
+static lv_img_dsc_t clip_img = {
     .header.cf = LV_IMG_CF_INDEXED_1BIT,
     .header.always_zero = 0,
     .header.reserved = 0,
-    .header.w = CLIP_W,
-    .header.h = CLIP_H,
-    .data_size = sizeof(buf),
     .data = buf,
 };
+static uint32_t clip_w, clip_h, clip_stride, clip_pixels;
 
 static lv_obj_t *target;
 static const struct clip *current;
@@ -46,25 +43,25 @@ static void reset_buffer(void) {
 #endif
     };
     memcpy(buf, palette, PALETTE_BYTES);
-    memset(buf + PALETTE_BYTES, 0xff, sizeof(buf) - PALETTE_BYTES);
+    memset(buf + PALETTE_BYTES, 0xff, clip_stride * clip_h);
 }
 
 static void toggle_run(uint32_t pix, uint32_t n) {
     uint8_t *pixels = buf + PALETTE_BYTES;
     while (n--) {
-        uint32_t row = pix / CLIP_W;
-        uint32_t col = pix - row * CLIP_W;
-        pixels[row * CLIP_STRIDE + (col >> 3)] ^= 0x80 >> (col & 7);
+        uint32_t row = pix / clip_w;
+        uint32_t col = pix - row * clip_w;
+        pixels[row * clip_stride + (col >> 3)] ^= 0x80 >> (col & 7);
         pix++;
     }
 }
 
 static void decode(const uint8_t *p, const uint8_t *end) {
     uint32_t pix = 0;
-    while (p < end && pix < CLIP_PIXELS) {
+    while (p < end && pix < clip_pixels) {
         uint8_t b = *p++;
         uint32_t n = b & 0x7f;
-        if (n == 0 || pix + n > CLIP_PIXELS) {
+        if (n == 0 || pix + n > clip_pixels) {
             return; /* corrupt frame: leave the rest as is */
         }
         if (b & 0x80) {
@@ -101,9 +98,17 @@ static void tick_cb(struct k_work *work) {
 
 void clip_play(lv_obj_t *img, const struct clip *clip, void (*done)(void)) {
     clip_stop();
-    if (!clip || clip->frames == 0) {
+    if (!clip || clip->frames == 0 || clip->w == 0 || clip->w > MAX_W || clip->h == 0 ||
+        clip->h > MAX_H) {
         return;
     }
+    clip_w = clip->w;
+    clip_h = clip->h;
+    clip_stride = (clip_w + 7) / 8;
+    clip_pixels = clip_w * clip_h;
+    clip_img.header.w = clip_w;
+    clip_img.header.h = clip_h;
+    clip_img.data_size = PALETTE_BYTES + clip_stride * clip_h;
     target = img;
     current = clip;
     frame = 0;

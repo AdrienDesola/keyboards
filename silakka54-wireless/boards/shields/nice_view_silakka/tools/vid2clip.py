@@ -2,12 +2,14 @@
 """Turn a video excerpt into a one-bit flipbook for the right nice!view.
 
     vid2clip.py <video> <name> --start 30 --duration 8 --fps 12 \
-        [--crop x,y,w,h] [--mode thresh|bayer] [--contrast 1.5] [--gamma 1.0] \
+        [--size 68x140] [--crop x,y,w,h] [--mode thresh|bayer] [--contrast 1.5] [--gamma 1.0] \
         [--smooth 0.3] [--invert] [--out DIR]
 
 Writes <out>/<name>.json (frames + stats for the browser mock) and
 <out>/clip_<name>.c (packed frames for the firmware, drop it in widgets/). Frames are stored in the
-display's own orientation (140 wide, 68 tall) as run-length bytes: bit 7 is the
+display's own orientation (height wide, width tall; 140x68 for the right
+half's art area, 80x68 for the left stage, pass --size as the user sees it,
+width x height) as run-length bytes: bit 7 is the
 pixel value, bits 0-6 the run length (1-127). Every frame after the first is
 XORed with the previous one before packing, so still backgrounds cost nothing.
 
@@ -24,7 +26,7 @@ import tempfile
 
 from PIL import Image
 
-W, H = 68, 140  # portrait, as the user sees it
+W, H = 68, 140  # portrait, as the user sees it; --size overrides
 BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
 
@@ -70,11 +72,11 @@ def to_bits(gray, mode, thresh):
 
 
 def rotate(bits):
-    """Portrait (x,y) -> display image (bx = 139 - y, by = x), 140 wide, 68 tall."""
-    img = [[0] * 140 for _ in range(68)]
+    """Portrait (x,y) -> display image (bx = H-1 - y, by = x), H wide, W tall."""
+    img = [[0] * H for _ in range(W)]
     for y in range(H):
         for x in range(W):
-            img[x][139 - y] = bits[y][x]
+            img[x][H - 1 - y] = bits[y][x]
     return img
 
 
@@ -95,10 +97,10 @@ def pack(img):
 def raw_bytes(img):
     out = bytearray()
     for row in img:
-        for b in range(0, 140, 8):
+        for b in range(0, H, 8):
             byte = 0
             for k in range(8):
-                if b + k < 140 and row[b + k]:
+                if b + k < H and row[b + k]:
                     byte |= 0x80 >> k
             out.append(byte)
     return bytes(out)
@@ -111,6 +113,7 @@ def main():
     ap.add_argument("--start", type=float, default=0)
     ap.add_argument("--duration", type=float, default=8)
     ap.add_argument("--fps", type=int, default=12)
+    ap.add_argument("--size", default="68x140", help="WxH as the user sees it, max 68x140")
     ap.add_argument("--crop", help="x,y,w,h in source pixels before fitting")
     ap.add_argument("--mode", choices=["thresh", "bayer"], default="thresh")
     ap.add_argument("--thresh", type=float, default=0.5)
@@ -121,6 +124,10 @@ def main():
     ap.add_argument("--invert", action="store_true")
     ap.add_argument("--out", default=".")
     a = ap.parse_args()
+    global W, H
+    W, H = (int(v) for v in a.size.lower().split("x"))
+    if W > 68 or H > 140 or W < 1 or H < 1:
+        sys.exit("size must be at most 68x140")
     crop = tuple(int(v) for v in a.crop.split(",")) if a.crop else None
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -145,7 +152,7 @@ def main():
         delta = img if prev is None else [[p ^ q for p, q in zip(r1, r2)] for r1, r2 in zip(img, prev)]
         packed.append(pack(delta))
         prev = img
-    raw_total = len(imgs) * 1190
+    raw_total = len(imgs) * ((H + 7) // 8) * W
     packed_total = sum(len(p) for p in packed)
 
     os.makedirs(a.out, exist_ok=True)
@@ -179,7 +186,7 @@ def main():
         offs.append(off)
         fh.write(", ".join(str(o) for o in offs) + "\n};\n\n")
         fh.write(f"const struct clip {a.name} = {{\n"
-                 f"    .frames = {len(imgs)},\n    .fps = {a.fps},\n"
+                 f"    .frames = {len(imgs)},\n    .fps = {a.fps},\n    .w = {H},\n    .h = {W},\n"
                  f"    .data = {a.name}_data,\n    .offsets = {a.name}_offsets,\n}};\n")
 
     print(f"{a.name}: {len(imgs)} frames @ {a.fps} fps, packed {packed_total} B "
