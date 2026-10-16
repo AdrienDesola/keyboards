@@ -32,6 +32,6 @@ still, optional blink, pose and asleep stills, and optional flipbook clips for p
 Set `CONFIG_NICE_VIEW_SILAKKA_THEME` in `silakka54.conf` and reflash both halves; only the chosen theme, and only
 each half's own part of it, is compiled. See `SPEC.md`, section Themes, for the exact behaviour.
 
-Making art: `tools/img2art.py` fits a picture into one-bit stills; `tools/vid2clip.py <video> <name> --start S
+Making art: `tools/img2still.py` cuts one-bit stills from pictures or video frames (`img2art.py` compares dithering modes); `tools/vid2clip.py <video> <name> --start S
 --duration D --fps 12 --size 68x140` (or `68x80` for the left) turns video into `clip_<name>.c` (run-length frames,
 XOR deltas, about 100 to 900 bytes a frame depending on how flat the art is). Both need Pillow, the clip tool ffmpeg.
