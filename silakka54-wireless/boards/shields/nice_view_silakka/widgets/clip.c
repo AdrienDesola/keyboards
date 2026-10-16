@@ -31,9 +31,10 @@ static const struct clip *current;
 static uint16_t frame;
 static void (*done_cb)(void);
 
-/* Ink is bit 0 with this palette, the polarity gen_jack.py settled on for this
- * board. The converter writes 1 = ink, so the buffer starts all ones and every
- * frame, the first included, toggles its 1-runs into it. */
+/* Same polarity as the stills from gen_jack.py: on this board data bit 1 shows
+ * as ink (the screen renders the stock palette as a negative). The converter
+ * writes 1 = ink, so the buffer starts all paper (zeros) and every frame, the
+ * first included, toggles its 1-runs into it. */
 static void reset_buffer(void) {
     static const uint8_t palette[PALETTE_BYTES] = {
 #if CONFIG_NICE_VIEW_SILAKKA_WIDGET_INVERTED
@@ -43,7 +44,7 @@ static void reset_buffer(void) {
 #endif
     };
     memcpy(buf, palette, PALETTE_BYTES);
-    memset(buf + PALETTE_BYTES, 0xff, clip_stride * clip_h);
+    memset(buf + PALETTE_BYTES, 0x00, clip_stride * clip_h);
 }
 
 static void toggle_run(uint32_t pix, uint32_t n) {
