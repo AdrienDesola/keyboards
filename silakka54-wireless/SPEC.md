@@ -60,6 +60,12 @@ Source of truth for what this firmware does. Change behavior, change this file i
 - Linked to the left half: awake. Blinks for 250 ms every `CONFIG_NICE_VIEW_SILAKKA_ART_BLINK_MS` while the right
   half is typed on. Every `CONFIG_NICE_VIEW_SILAKKA_ART_IDLE_MS` idle: blink, classic bust for 60 s, back to staff.
 - Not linked: asleep, eyes closed, Zs shown for 1 s once per idle period.
+- Flipbook clips (`CONFIG_NICE_VIEW_SILAKKA_CLIP`, on by default): one-bit films from `tools/vid2clip.py`, stored as
+  `widgets/clip_<name>.c`, mapped to events in `widgets/clips.c`. `clip_boot` plays at power-on and at every wake from
+  deep sleep, `clip_link` when the left half links, `clip_idle` when typing stops while linked. A clip never
+  interrupts another; Jack resumes after the last frame. A key press or a lost link cuts a clip short. Frame rate is
+  the clip's own, capped at 15 fps; the player runs on the display thread, so keys are never delayed by it.
+  Current mapping: the Steamboat Willie wheel test clip (8 s, 12 fps, 84 KB) on all three events.
 - Polarity: this board shows the stock LVGL palette as a negative for images while canvas drawing is fine.
   `INVERT = True` in `gen_jack.py` flips the data bits. Cause unknown. Check on the real screen before trusting a mock.
 

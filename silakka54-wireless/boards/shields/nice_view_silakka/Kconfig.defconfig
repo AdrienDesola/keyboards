@@ -55,6 +55,10 @@ config NICE_VIEW_SILAKKA_ART_IDLE_MS
     int "Right half: period of the idle move (awake: blink + bat flap, asleep: Zs drift), in ms (0 = never)"
     default 120000
 
+config NICE_VIEW_SILAKKA_CLIP
+    bool "Right half: play the flipbook clips mapped in widgets/clips.c at power-on, link and idle"
+    default y
+
 config NICE_VIEW_SILAKKA_NAME_SCROLL_MS
     int "Scroll step for a host name wider than the screen, in ms (0 = truncate instead)"
     default 150

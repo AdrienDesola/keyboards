@@ -5,6 +5,10 @@
  * otherwise), asleep while not linked (Zs show for a second every ART_IDLE_MS).
  * Every move is one or two redraws; nothing runs between them.
  *
+ * With CONFIG_NICE_VIEW_SILAKKA_CLIP, a flipbook clip (clips.c) plays at power-on,
+ * at link and at idle; the motion above resumes after its last frame. A key
+ * press or a lost link cuts it short.
+ *
  * SPDX-License-Identifier: MIT
  */
 
@@ -26,6 +30,17 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/ble.h>
 
 #include "peripheral_status.h"
+
+#if IS_ENABLED(CONFIG_NICE_VIEW_SILAKKA_CLIP)
+#include "clips.h"
+#else
+struct clip;
+#define clip_boot NULL
+#define clip_link NULL
+#define clip_idle NULL
+#define clip_playing() false
+#define clip_stop()
+#endif
 
 LV_IMG_DECLARE(jack_a);   // awake, eyes open
 LV_IMG_DECLARE(jack_b);   // awake, blink
@@ -99,8 +114,20 @@ static void restart_motion(void) {
     }
 }
 
+/* A clip replaces the motion until its last frame, then restart_motion() takes over. */
+static void start_clip(const struct clip *clip) {
+#if IS_ENABLED(CONFIG_NICE_VIEW_SILAKKA_CLIP)
+    if (art && clip) {
+        k_work_cancel_delayable(&motion_work);
+        clip_play(art, clip, restart_motion);
+        return;
+    }
+#endif
+    restart_motion();
+}
+
 static void motion_work_cb(struct k_work *work) {
-    if (!art) {
+    if (!art || clip_playing()) {
         return;
     }
     if (!linked) {
@@ -155,10 +182,18 @@ static int activity_listener(const zmk_event_t *eh) {
         return ZMK_EV_EVENT_BUBBLE;
     }
     bool now_typing = ev->state == ZMK_ACTIVITY_ACTIVE;
-    if (now_typing != typing) {
-        typing = now_typing;
-        k_work_schedule_for_queue(zmk_display_work_q(), &motion_work, K_NO_WAIT);
-        step = 0;
+    if (now_typing == typing) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    typing = now_typing;
+    if (typing) {
+        clip_stop(); // a key press cuts any clip short
+        restart_motion();
+    } else if (clip_playing()) {
+        // let it finish; restart_motion() reads the new state afterwards
+    } else if (linked) {
+        start_clip(clip_idle);
+    } else {
         restart_motion();
     }
     return ZMK_EV_EVENT_BUBBLE;
@@ -215,7 +250,12 @@ static void set_connection_status(struct zmk_widget_status *widget,
 
     if (state.connected != linked) {
         linked = state.connected;
-        restart_motion();
+        if (!linked) {
+            clip_stop();
+            restart_motion();
+        } else if (!clip_playing()) {
+            start_clip(clip_link);
+        }
     }
 }
 
@@ -242,7 +282,7 @@ int zmk_widget_status_init(struct zmk_widget_status *widget, lv_obj_t *parent) {
     widget_battery_status_init();
     widget_peripheral_status_init();
     linked = zmk_split_bt_peripheral_is_connected();
-    restart_motion();
+    start_clip(clip_boot);
 
     return 0;
 }

@@ -37,3 +37,8 @@ The right half shows Jack Skellington (`widgets/art.c`): awake while linked, a s
 The frames come from two illustrations fitted to 68x140 and Bayer-dithered by `tools/img2art.py` (sources in `tools/src/`);
 `tools/gen_jack.py` closes the eyes, adds the Zs and writes `art.c`. Both need Pillow. To swap the art, drop a new
 68x140 one-bit PNG in `tools/src/` and rerun `gen_jack.py`.
+
+The right half can also play short flipbook clips: at power-on, when the halves link, and when typing stops.
+`tools/vid2clip.py <video> <name> --start S --duration D --fps 12` turns any video into `clip_<name>.c`
+(run-length frames, XOR deltas, about 100 to 900 bytes a frame depending on how flat the art is);
+drop it in `widgets/` and point `widgets/clips.c` at it. Needs ffmpeg and Pillow.
