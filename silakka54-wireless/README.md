@@ -35,4 +35,3 @@ each half's own part of it, is compiled. See `SPEC.md`, section Themes, for the 
 Making art: `tools/img2art.py` fits a picture into one-bit stills; `tools/vid2clip.py <video> <name> --start S
 --duration D --fps 12 --size 68x140` (or `68x80` for the left) turns video into `clip_<name>.c` (run-length frames,
 XOR deltas, about 100 to 900 bytes a frame depending on how flat the art is). Both need Pillow, the clip tool ffmpeg.
-`tools/gen_jack.py` rebuilds the jack theme's right-half stills.

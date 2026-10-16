@@ -8,8 +8,8 @@ SOURCE is an image, or a video with @SECONDS for the frame at that time.
 --crop is in source pixels and applies to every still in the call; --size is
 the stage as the user sees it (68x140 right, 68x80 left). --fit keeps the crop's
 aspect and pads with paper instead of stretching. Writes LVGL indexed
-1-bit images in the display's orientation, same polarity as gen_jack.py (data
-bit 1 = ink on this board), one lv_img_dsc_t per NAME, plus OUT.png previews.
+1-bit images in the display's orientation, polarity this board needs
+(data bit 1 = ink: the screen renders the stock palette as a negative), one lv_img_dsc_t per NAME, plus OUT.png previews.
 
 Needs Pillow, and ffmpeg for video sources.
 """

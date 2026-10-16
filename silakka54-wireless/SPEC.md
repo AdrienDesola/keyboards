@@ -50,7 +50,7 @@ Rows as the user sees the screen, top to bottom: 68 status, 80 stage, 12 layer.
   next link. Bonded slot with no name yet: the label from `CONFIG_NICE_VIEW_SILAKKA_PROFILE_NAMES` (unset, so blank).
   Empty slot: `open`.
   A name wider than the screen scrolls once, one step per `CONFIG_NICE_VIEW_SILAKKA_NAME_SCROLL_MS`, then parks.
-- Stage: 80 rows of the theme's left art (see Themes). Empty in the jack theme until left art exists.
+- Stage: 80 rows of the theme's left art (see Themes).
 - Layer: name in the small unscii font, bottom strip. For debugging, rarely looked at.
 - No WPM: the graph and the ZMK WPM module were removed.
 - Polarity: black text on white.
@@ -64,7 +64,7 @@ Rows as the user sees the screen, top to bottom: 68 status, 80 stage, 12 layer.
 
 - A theme is a folder `boards/shields/nice_view_silakka/themes/<name>/` with `left/` and `right/`. Each holds a
   `theme.c` defining `theme_side` (`widgets/theme.h`) plus the stills and clips it points at.
-  `CONFIG_NICE_VIEW_SILAKKA_THEME` (set in `silakka54.conf`, default `jack`) picks the folder at build time. Each half
+  `CONFIG_NICE_VIEW_SILAKKA_THEME` (set in `silakka54.conf`, default `nhl95`) picks the folder at build time. Each half
   compiles only its own subfolder of the selected theme, so other themes and the other half's art take no flash.
   Changing theme means editing that line and reflashing both halves.
 - Stage behaviour, shared by both halves (`widgets/stage.c`), every field optional:
@@ -78,10 +78,17 @@ Rows as the user sees the screen, top to bottom: 68 status, 80 stage, 12 layer.
 - Link state comes from the Bluetooth stack's connection callbacks, filtered by role: the split link is the one where
   the left half is central and the right half peripheral. Host links are ignored.
 - Sizes as the user sees them: right 68x140, left 68x80. `tools/vid2clip.py --size WxH` makes clips,
-  `tools/img2art.py` stills.
-- jack theme, right: Jack Skellington, frames from `tools/gen_jack.py` (staff pose open, blink, classic bust, bust
-  asleep, bust with Zs). Clips: the Steamboat Willie wheel test clip (8 s, 12 fps, 84 KB) on boot, link and idle.
-  Left: empty.
+  `tools/img2still.py` stills.
+- nhl95 theme (NHL Hockey '95, Game Boy), the only theme. Its folder is ignored by git because the art is the game's
+  copyrighted graphics; it exists only on the machine that made it. Built without it, both stages stay blank (the build
+  falls back to `widgets/theme_empty.c` with a warning).
+  - Right: Bill Brown at the desk (`rest`), his next intro line held a minute when idle (`pose`), EA SPORTS logo while
+    not linked (`asleep`). Clips: boot = Game Boy Nintendo scroll then EA SPORTS (4 s); link = opening faceoff from
+    above (6 s); idle = a goal at the net (6 s).
+  - Left: the HUD referee at twice the Game Boy pixel size, arms crossed (`rest`), arms shifted (`blink`), pointing
+    (`pose`). Clips: link = faceoff close-up, raises and drops the puck (2.6 s); idle = arm up for offside (2.2 s).
+  - Source: World-of-Longplays' Game Boy longplay of NHL Hockey '95, cut with `tools/img2still.py` and
+    `tools/vid2clip.py`.
 
 ## Power
 

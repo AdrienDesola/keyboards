@@ -31,7 +31,7 @@ static const struct clip *current;
 static uint16_t frame;
 static void (*done_cb)(void);
 
-/* Same polarity as the stills from gen_jack.py: on this board data bit 1 shows
+/* Same polarity as the stills from img2still.py: on this board data bit 1 shows
  * as ink (the screen renders the stock palette as a negative). The converter
  * writes 1 = ink, so the buffer starts all paper (zeros) and every frame, the
  * first included, toggles its 1-runs into it. */
