@@ -2,7 +2,7 @@
 """Turn a video excerpt into a one-bit flipbook for the right nice!view.
 
     vid2clip.py <video> <name> --start 30 --duration 8 --fps 12 \
-        [--size 68x140] [--crop x,y,w,h] [--mode thresh|bayer] [--contrast 1.5] [--gamma 1.0] \
+        [--size 68x140] [--crop x,y,w,h] [--fit] [--drop 3,17] [--mode thresh|bayer] [--contrast 1.5] [--gamma 1.0] \
         [--smooth 0.3] [--invert] [--out DIR]
 
 Writes <out>/<name>.json (frames + stats for the browser mock) and
@@ -30,15 +30,20 @@ W, H = 68, 140  # portrait, as the user sees it; --size overrides
 BAYER4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
 
-def extract(video, start, duration, fps, crop, tmp):
+def extract(video, start, duration, fps, crop, tmp, fit=False):
     vf = []
     if crop:
         x, y, w, h = crop
         vf.append(f"crop={w}:{h}:{x}:{y}")
     vf.append(f"fps={fps}")
-    # fit to the portrait aspect by scaling then centre-cropping
-    vf.append(f"scale='if(gt(a,{W}/{H}),-2,{W*8})':'if(gt(a,{W}/{H}),{H*8},-2)'")
-    vf.append(f"crop={W*8}:{H*8}")
+    if fit:
+        # keep the whole picture, pad with paper
+        vf.append(f"scale={W*8}:{H*8}:force_original_aspect_ratio=decrease")
+        vf.append(f"pad={W*8}:{H*8}:(ow-iw)/2:(oh-ih)/2:color=white")
+    else:
+        # fill the portrait aspect by scaling then centre-cropping
+        vf.append(f"scale='if(gt(a,{W}/{H}),-2,{W*8})':'if(gt(a,{W}/{H}),{H*8},-2)'")
+        vf.append(f"crop={W*8}:{H*8}")
     cmd = ["ffmpeg", "-v", "error", "-y", "-ss", str(start), "-t", str(duration), "-i", video,
            "-vf", ",".join(vf), "-pix_fmt", "gray", os.path.join(tmp, "f%04d.png")]
     subprocess.run(cmd, check=True)
@@ -115,6 +120,8 @@ def main():
     ap.add_argument("--fps", type=int, default=12)
     ap.add_argument("--size", default="68x140", help="WxH as the user sees it, max 68x140")
     ap.add_argument("--crop", help="x,y,w,h in source pixels before fitting")
+    ap.add_argument("--fit", action="store_true", help="keep the crop's aspect, pad with paper")
+    ap.add_argument("--drop", default="", help="comma-separated frame indices to leave out (source glitches)")
     ap.add_argument("--mode", choices=["thresh", "bayer"], default="thresh")
     ap.add_argument("--thresh", type=float, default=0.5)
     ap.add_argument("--contrast", type=float, default=1.5)
@@ -131,7 +138,9 @@ def main():
     crop = tuple(int(v) for v in a.crop.split(",")) if a.crop else None
 
     with tempfile.TemporaryDirectory() as tmp:
-        files = extract(a.video, a.start, a.duration, a.fps, crop, tmp)
+        files = extract(a.video, a.start, a.duration, a.fps, crop, tmp, a.fit)
+        drop = {int(v) for v in a.drop.split(",") if v.strip()}
+        files = [f for i, f in enumerate(files) if i not in drop]
         frames = []
         prev_gray = None
         for f in files:
