@@ -178,16 +178,17 @@ static void count_split_links(struct bt_conn *conn, void *data) {
 
 /* ---- typing state ---------------------------------------------------- */
 
-static int activity_listener(const zmk_event_t *eh) {
-    const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
-    if (ev == NULL) {
-        return ZMK_EV_EVENT_BUBBLE;
+/* Activity events arrive on whichever thread noted the key press; LVGL and the
+ * clip player only run on the display thread, so hand the change over. */
+static void typing_work_cb(struct k_work *work);
+K_WORK_DEFINE(typing_work, typing_work_cb);
+static bool typing_now = true;
+
+static void typing_work_cb(struct k_work *work) {
+    if (typing_now == typing) {
+        return;
     }
-    bool now_typing = ev->state == ZMK_ACTIVITY_ACTIVE;
-    if (now_typing == typing) {
-        return ZMK_EV_EVENT_BUBBLE;
-    }
-    typing = now_typing;
+    typing = typing_now;
     if (typing) {
         clip_stop(); // a key press cuts any clip short
         restart_motion();
@@ -198,6 +199,15 @@ static int activity_listener(const zmk_event_t *eh) {
     } else {
         restart_motion();
     }
+}
+
+static int activity_listener(const zmk_event_t *eh) {
+    const struct zmk_activity_state_changed *ev = as_zmk_activity_state_changed(eh);
+    if (ev == NULL) {
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+    typing_now = ev->state == ZMK_ACTIVITY_ACTIVE;
+    k_work_submit_to_queue(zmk_display_work_q(), &typing_work);
     return ZMK_EV_EVENT_BUBBLE;
 }
 ZMK_LISTENER(stage_activity, activity_listener);
