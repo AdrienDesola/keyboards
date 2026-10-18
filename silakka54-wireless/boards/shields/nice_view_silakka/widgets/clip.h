@@ -9,6 +9,11 @@
  * previous one before packing, so a still background costs nothing. The
  * player keeps one 140x68 one-bit buffer and toggles the runs into it.
  *
+ * Busy line art packs better as bytes (codec CLIP_BYTES): each frame is the
+ * XOR delta in the buffer's own layout (rows of (w + 7) / 8 bytes, MSB first),
+ * coded as headers: 0x00-0x7f is followed by header + 1 literal bytes to XOR
+ * in, 0x80-0xff skips header - 0x7f unchanged bytes.
+ *
  * SPDX-License-Identifier: MIT
  */
 
@@ -18,6 +23,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+enum clip_codec {
+    CLIP_BITS = 0,  /* bit runs, the default */
+    CLIP_BYTES = 1, /* zero-run / literal bytes */
+};
+
 struct clip {
     uint16_t frames;
     uint8_t fps;
@@ -25,6 +35,7 @@ struct clip {
     uint8_t h;
     const uint8_t *data;
     const uint32_t *offsets; /* frames + 1 entries, byte offset of each frame in data */
+    uint8_t codec;           /* enum clip_codec */
 };
 
 /* Play a clip on an lv_img object. done runs on the display thread after the

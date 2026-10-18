@@ -17,7 +17,7 @@
 #define MAX_FPS 15
 
 /* Same layout as the frames in art.c: LVGL indexed 1-bit, palette first. */
-static uint8_t buf[PALETTE_BYTES + MAX_STRIDE * MAX_H];
+static uint8_t buf[PALETTE_BYTES + MAX_STRIDE * MAX_H] __aligned(4);
 static lv_img_dsc_t clip_img = {
     .header.cf = LV_IMG_CF_INDEXED_1BIT,
     .header.always_zero = 0,
@@ -72,6 +72,25 @@ static void decode(const uint8_t *p, const uint8_t *end) {
     }
 }
 
+static void decode_bytes(const uint8_t *p, const uint8_t *end) {
+    uint8_t *pixels = buf + PALETTE_BYTES;
+    uint32_t pos = 0, size = clip_stride * clip_h;
+    while (p < end && pos < size) {
+        uint8_t b = *p++;
+        if (b & 0x80) {
+            pos += b - 0x7f;
+            continue;
+        }
+        uint32_t n = b + 1;
+        if (pos + n > size || p + n > end) {
+            return; /* corrupt frame: leave the rest as is */
+        }
+        while (n--) {
+            pixels[pos++] ^= *p++;
+        }
+    }
+}
+
 static void tick_cb(struct k_work *work);
 K_WORK_DELAYABLE_DEFINE(tick_work, tick_cb);
 
@@ -80,7 +99,12 @@ static void tick_cb(struct k_work *work) {
     if (!c || !target) {
         return;
     }
-    decode(c->data + c->offsets[frame], c->data + c->offsets[frame + 1]);
+    const uint8_t *start = c->data + c->offsets[frame], *end = c->data + c->offsets[frame + 1];
+    if (c->codec == CLIP_BYTES) {
+        decode_bytes(start, end);
+    } else {
+        decode(start, end);
+    }
     lv_img_cache_invalidate_src(&clip_img);
     lv_img_set_src(target, &clip_img);
     lv_obj_invalidate(target);
