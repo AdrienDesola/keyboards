@@ -99,6 +99,14 @@ static void tick_cb(struct k_work *work) {
     if (!c || !target) {
         return;
     }
+    if (frame == c->frames) {
+        // the last frame has been on screen for one frame period
+        current = NULL;
+        if (done_cb) {
+            done_cb();
+        }
+        return;
+    }
     const uint8_t *start = c->data + c->offsets[frame], *end = c->data + c->offsets[frame + 1];
     if (c->codec == CLIP_BYTES) {
         decode_bytes(start, end);
@@ -110,15 +118,8 @@ static void tick_cb(struct k_work *work) {
     lv_obj_invalidate(target);
 
     frame++;
-    if (frame < c->frames) {
-        uint32_t fps = MIN(c->fps ? c->fps : 1, MAX_FPS);
-        k_work_schedule_for_queue(zmk_display_work_q(), &tick_work, K_MSEC(1000 / fps));
-        return;
-    }
-    current = NULL;
-    if (done_cb) {
-        done_cb();
-    }
+    uint32_t fps = MIN(c->fps ? c->fps : 1, MAX_FPS);
+    k_work_schedule_for_queue(zmk_display_work_q(), &tick_work, K_MSEC(1000 / fps));
 }
 
 void clip_play(lv_obj_t *img, const struct clip *clip, void (*done)(void)) {

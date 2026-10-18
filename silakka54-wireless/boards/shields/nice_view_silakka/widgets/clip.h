@@ -38,9 +38,9 @@ struct clip {
     uint8_t codec;           /* enum clip_codec */
 };
 
-/* Play a clip on an lv_img object. done runs on the display thread after the
- * last frame, not when the clip is stopped. Playing a clip replaces the one in
- * progress. A NULL clip stops. */
+/* Play a clip on an lv_img object. done runs on the display thread once the
+ * last frame has been on screen for a frame period, not when the clip is
+ * stopped. Playing a clip replaces the one in progress. A NULL clip stops. */
 void clip_play(lv_obj_t *img, const struct clip *clip, void (*done)(void));
 void clip_stop(void);
 bool clip_playing(void);
