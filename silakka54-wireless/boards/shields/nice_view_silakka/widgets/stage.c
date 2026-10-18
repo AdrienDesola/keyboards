@@ -170,8 +170,13 @@ BT_CONN_CB_DEFINE(stage_conn_cb) = {
     .disconnected = on_disconnected,
 };
 
+/* bt_conn_foreach also lists connections still being set up (advertising to
+ * hosts, the split link being created), whose role reads as central; only a
+ * finished connection counts. The callbacks above need no such check. */
 static void count_split_links(struct bt_conn *conn, void *data) {
-    if (is_split_link(conn)) {
+    struct bt_conn_info info;
+    if (is_split_link(conn) && bt_conn_get_info(conn, &info) == 0 &&
+        info.state == BT_CONN_STATE_CONNECTED) {
         *(bool *)data = true;
     }
 }
