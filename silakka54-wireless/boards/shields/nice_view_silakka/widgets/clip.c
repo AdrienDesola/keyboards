@@ -29,6 +29,7 @@ static uint32_t clip_w, clip_h, clip_stride, clip_pixels;
 static lv_obj_t *target;
 static const struct clip *current;
 static uint16_t frame;
+static uint8_t fps_now; /* 0: held on the current frame */
 static void (*done_cb)(void);
 
 /* Same polarity as the stills from img2still.py: on this board data bit 1 shows
@@ -118,8 +119,9 @@ static void tick_cb(struct k_work *work) {
     lv_obj_invalidate(target);
 
     frame++;
-    uint32_t fps = MIN(c->fps ? c->fps : 1, MAX_FPS);
-    k_work_schedule_for_queue(zmk_display_work_q(), &tick_work, K_MSEC(1000 / fps));
+    if (fps_now) {
+        k_work_schedule_for_queue(zmk_display_work_q(), &tick_work, K_MSEC(1000 / fps_now));
+    }
 }
 
 void clip_play(lv_obj_t *img, const struct clip *clip, void (*done)(void)) {
@@ -138,14 +140,32 @@ void clip_play(lv_obj_t *img, const struct clip *clip, void (*done)(void)) {
     target = img;
     current = clip;
     frame = 0;
+    fps_now = MIN(clip->fps ? clip->fps : 1, MAX_FPS);
     done_cb = done;
     reset_buffer();
     k_work_schedule_for_queue(zmk_display_work_q(), &tick_work, K_NO_WAIT);
 }
 
 void clip_stop(void) {
-    k_work_cancel_delayable(&tick_work);
+    /* From the tick itself (a done callback starting the next loop) nothing is
+     * scheduled, and cancelling the running work would make Zephyr refuse the
+     * clip's first tick: the screen would stay on the cleared buffer. */
+    if (!(k_work_delayable_busy_get(&tick_work) & K_WORK_RUNNING)) {
+        k_work_cancel_delayable(&tick_work);
+    }
     current = NULL;
 }
 
 bool clip_playing(void) { return current != NULL; }
+
+void clip_set_fps(uint8_t fps) {
+    fps = MIN(fps, MAX_FPS);
+    if (!current || fps == fps_now) {
+        return;
+    }
+    bool was_held = fps_now == 0;
+    fps_now = fps;
+    if (fps && was_held) {
+        k_work_schedule_for_queue(zmk_display_work_q(), &tick_work, K_MSEC(1000 / fps));
+    }
+}

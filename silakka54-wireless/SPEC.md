@@ -75,6 +75,17 @@ Rows as the user sees the screen, top to bottom: 68 status, 80 stage, 12 layer.
     the halves link, on both halves at once, so a matched pair plays together; `idle` when typing stops while
     linked. A clip never interrupts another except `link`, which waits for nothing. A key press or a lost link cuts a
     clip short. Frame rate is the clip's own, capped at 15 fps, on the display thread, so keys never wait on it.
+  - Skating, when the theme has `skate`: while linked and typed on, a loop replaces `rest`/`blink`. The typing rate is
+    key presses (either half, counted where the press is raised) sampled every 250 ms over the last 2 s. Nothing in
+    the last second: `glide` at its own rate (no `glide`: `skate` held on its frame). Under 10 presses: `skate` at
+    2 fps plus 1 per press, up to 12. From 10 (leaving below 8): `sprint` at 12 fps. A gait change starts the new
+    loop from its first frame.
+  - `crouch` (left only, Ctrl is a keycode the central sees): Ctrl held while skating plays it once and keeps its
+    last frame until Ctrl is released, then skating resumes.
+  - `shot` on an Enter tap while linked, unless a non-skate clip is playing; `miss` instead four times in five when
+    the theme has one. The left reads the Enter keycode; the right has no keymap and reads a tap of key position
+    `CONFIG_NICE_VIEW_SILAKKA_SHOT_POSITION` (51) shorter than `CONFIG_NICE_VIEW_SILAKKA_SHOT_TAP_MS` (200) with no
+    other key released meanwhile. Each half rolls its own outcome, so only the right decides goal or post.
 - Link state comes from the Bluetooth stack's connection callbacks, filtered by role: the split link is the one where
   the left half is central and the right half peripheral. Host links are ignored.
 - Sizes as the user sees them: right 68x140, left 68x80. `tools/vid2clip.py --size WxH` makes clips from a video,
@@ -85,8 +96,11 @@ Rows as the user sees the screen, top to bottom: 68 status, 80 stage, 12 layer.
 - habs theme: Canadiens #85 against the Leafs' #1 in black-and-white manga ink (AI stills and motion made locally,
   puck, streaks, GOAL! and Zamboni drawn in code). Ignored by git for the team names and logos. Boot = the faceoff
   split across both halves; link = #85 shoots off the left screen, the puck goes in top shelf on the right, GOAL!;
-  idle = the Zamboni crossing both screens and leaving fresh ice; rest/blink = typing poses; asleep = searching poses.
-  The folder also holds loops for searching, typing and host search, unused until the stage can play loops.
+  rest/blink = typing poses; asleep = searching poses. Left, #85: skate = two strides, glide = coasting sway, sprint =
+  the stride leaned hard with speed lines, crouch = sinks low, shot = the link slap shot, idle = juggling the puck on
+  his blade (10 s). Right, the goalie: idle = drinks from his water bottle; on Enter he drops into the butterfly, shot =
+  beaten top shelf, GOAL!; miss = off the post, TING!. The folder also holds unused loops (searching, typing, host
+  search, Zamboni, bench).
 - nhl95 theme (NHL Hockey '95, Game Boy). Its folder is ignored by git because the art is the game's
   copyrighted graphics; it exists only on the machine that made it. Built without it, both stages stay blank (the build
   falls back to `widgets/theme_empty.c` with a warning).

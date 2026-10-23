@@ -55,6 +55,14 @@ config NICE_VIEW_SILAKKA_ART_IDLE_MS
     int "Stage: period of the idle move (awake: blink + bat flap, asleep: Zs drift), in ms (0 = never)"
     default 120000
 
+config NICE_VIEW_SILAKKA_SHOT_POSITION
+    int "Stage: key position the right half reads as Enter for the theme's shot (-1 = none)"
+    default 51
+
+config NICE_VIEW_SILAKKA_SHOT_TAP_MS
+    int "Stage: longest press of that key the right half counts as a tap (the keymap's tapping term)"
+    default 200
+
 config NICE_VIEW_SILAKKA_NAME_SCROLL_MS
     int "Scroll step for a host name wider than the screen, in ms (0 = truncate instead)"
     default 150

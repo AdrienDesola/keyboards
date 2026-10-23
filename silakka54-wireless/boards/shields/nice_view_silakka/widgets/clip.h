@@ -44,3 +44,6 @@ struct clip {
 void clip_play(lv_obj_t *img, const struct clip *clip, void (*done)(void));
 void clip_stop(void);
 bool clip_playing(void);
+/* Change the rate of the clip in progress, up to 15 fps; 0 holds the frame on
+ * screen until the next call. clip_play() starts at the clip's own rate. */
+void clip_set_fps(uint8_t fps);

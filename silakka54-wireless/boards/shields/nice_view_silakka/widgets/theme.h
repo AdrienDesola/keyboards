@@ -24,6 +24,12 @@ struct theme_side {
     const struct clip *boot;        /* power-on and every wake from deep sleep, while not yet linked */
     const struct clip *link;        /* the other half just linked; cuts anything short, both halves start together */
     const struct clip *idle;        /* typing stopped while linked */
+    const struct clip *skate;       /* stride, looped while typing, faster with the typing rate */
+    const struct clip *glide;       /* looped instead when typing pauses for a second (else skate is held) */
+    const struct clip *sprint;      /* looped instead at about 60 WPM and up */
+    const struct clip *crouch;      /* Ctrl pressed while typing: plays once, last frame held while it's down (left half only) */
+    const struct clip *shot;        /* Enter tapped while linked */
+    const struct clip *miss;        /* played instead of shot four times out of five, if set */
 };
 
 /* Defined by themes/<name>/theme.c for the half being built. */
